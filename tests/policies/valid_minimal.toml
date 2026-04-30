@@ -1,0 +1,30 @@
+version = 1
+
+[[fs_layer]]
+handled_access_fs = ["read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/usr"
+  allowed_access = ["read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/etc"
+  allowed_access = ["read_file"]
+
+[[fs_layer]]
+handled_access_fs = ["write_file", "truncate"]
+
+  [[fs_layer.rule]]
+  path = "/tmp"
+  allowed_access = ["write_file"]
+
+[net]
+handled_access_net = ["bind_tcp", "connect_tcp"]
+
+  [[net.rule]]
+  port = 80
+  allowed_access = ["connect_tcp"]
+
+  [[net.rule]]
+  port = 8080
+  allowed_access = ["bind_tcp"]

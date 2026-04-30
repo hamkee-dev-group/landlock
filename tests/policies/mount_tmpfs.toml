@@ -1,0 +1,10 @@
+version = 1
+
+[mount]
+tmpfs = ["/tmp/landlockd-tmpfs-mount"]
+proc = ["/tmp/landlockd-proc-mount"]
+
+[[mount.bind]]
+source = "/tmp/landlockd-bind-source"
+target = "/tmp/landlockd-bind-target"
+read_only = true

@@ -1,0 +1,8 @@
+version = 1
+
+[[fs_layer]]
+handled_access_fs = ["read_file", "frobnicate"]
+
+  [[fs_layer.rule]]
+  path = "/usr"
+  allowed_access = ["read_file"]

@@ -1,0 +1,13 @@
+version = 1
+
+[broker]
+allow_read = ["/etc/resolv.conf"]
+allow_write = ["/tmp/landlockd-broker-write"]
+scratch = ["/tmp/landlockd-scratch-root"]
+export = ["/tmp/landlockd-export-root"]
+mount_tmpfs = ["/tmp/landlockd-broker-mount"]
+
+  [[broker.mount_bind]]
+  source = "/tmp/landlockd-broker-bind-source"
+  target = "/tmp/landlockd-broker-bind-target"
+  read_only = true

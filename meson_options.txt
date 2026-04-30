@@ -1,0 +1,9 @@
+option('policy_helper',
+  type : 'feature',
+  value : 'enabled',
+  description : 'Build and use the out-of-process internal policy loader helper')
+
+option('policy_helper_rust',
+  type : 'feature',
+  value : 'auto',
+  description : 'Build the optional Rust policy loader helper for memory-safe TOML parsing')

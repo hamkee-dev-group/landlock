@@ -1,0 +1,5 @@
+version = 1
+
+[seccomp]
+deny = ["getpid"]
+errno = 0

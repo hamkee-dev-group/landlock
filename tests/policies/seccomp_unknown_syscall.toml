@@ -1,0 +1,4 @@
+version = 1
+
+[seccomp]
+deny = ["definitely_not_a_syscall"]

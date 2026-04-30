@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://landlockd/policy.schema.json",
+  "title": "landlockd policy",
+  "description": "Source-of-truth schema for landlockd TOML policy files. The loader in src/landlock_policy_loader.c enforces the same constraints against the parsed TOML tree.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Policy schema version. Only 1 is currently supported."
+    },
+    "fs_layer": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fs_layer"}
+    },
+    "net": {"$ref": "#/$defs/net"},
+    "broker": {"$ref": "#/$defs/broker"},
+    "mount": {"$ref": "#/$defs/mount"},
+    "runtime": {"$ref": "#/$defs/runtime"},
+    "seccomp": {"$ref": "#/$defs/seccomp"}
+  },
+  "$defs": {
+    "fs_access": {
+      "type": "string",
+      "enum": [
+        "execute", "write_file", "read_file", "read_dir",
+        "remove_dir", "remove_file", "make_char", "make_dir",
+        "make_reg", "make_sock", "make_fifo", "make_block",
+        "make_sym", "refer", "truncate", "ioctl_dev"
+      ]
+    },
+    "net_access": {
+      "type": "string",
+      "enum": ["bind_tcp", "connect_tcp"]
+    },
+    "seccomp_syscall": {
+      "type": "string",
+      "enum": [
+        "getpid", "getppid", "openat", "openat2", "mkdirat",
+        "unlinkat", "renameat2", "symlinkat", "linkat", "socket",
+        "connect", "mount", "umount2", "pivot_root", "open_tree",
+        "move_mount", "fsopen", "fsconfig", "fsmount", "mount_setattr", "unshare",
+        "setns", "clone3", "ptrace", "bpf", "perf_event_open",
+        "kexec_load", "init_module", "finit_module", "delete_module",
+        "open_by_handle_at", "swapon", "swapoff", "reboot"
+      ]
+    },
+    "fs_layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handled_access_fs"],
+      "properties": {
+        "handled_access_fs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/fs_access"}
+        },
+        "rule": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/fs_rule"}
+        }
+      }
+    },
+    "fs_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "allowed_access"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "allowed_access": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/fs_access"}
+        }
+      }
+    },
+    "net": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handled_access_net"],
+      "properties": {
+        "handled_access_net": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/net_access"}
+        },
+        "rule": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/net_rule"}
+        }
+      }
+    },
+    "net_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port", "allowed_access"],
+      "properties": {
+        "port": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "allowed_access": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/net_access"}
+        }
+      }
+    },
+    "broker": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_read": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "allow_write": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "scratch": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "export": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "mount_tmpfs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^/"
+          }
+        },
+        "mount_bind": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "target"],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^/"
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^/"
+              },
+              "read_only": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "mount_object": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "fs_type", "attach"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^/]+$"
+              },
+              "fs_type": {
+                "type": "string",
+                "enum": ["tmpfs", "proc"]
+              },
+              "attach": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^/"
+                }
+              },
+              "attrs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["readonly", "nosuid", "nodev", "noexec"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "mount": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {"required": ["tmpfs"]},
+        {"required": ["bind"]}
+      ],
+      "properties": {
+        "tmpfs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^/"
+          }
+        },
+        "bind": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "target"],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^/"
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^/"
+              },
+              "read_only": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "proc": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^/"
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {"required": ["root"]},
+        {"required": ["cwd"]}
+      ],
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^/"
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^/"
+        }
+      }
+    },
+    "seccomp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deny"],
+      "properties": {
+        "deny": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/seccomp_syscall"}
+        },
+        "errno": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4095
+        }
+      }
+    }
+  }
+}

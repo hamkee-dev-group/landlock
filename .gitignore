@@ -1,0 +1,6 @@
+# Generated build trees
+/build/
+/build-*/
+/builddir/
+/builddir*/
+/clean/

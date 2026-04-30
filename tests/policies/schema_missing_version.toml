@@ -1,0 +1,6 @@
+[[fs_layer]]
+handled_access_fs = ["read_file"]
+
+  [[fs_layer.rule]]
+  path = "/usr"
+  allowed_access = ["read_file"]

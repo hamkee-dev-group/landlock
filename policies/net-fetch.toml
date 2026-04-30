@@ -1,0 +1,54 @@
+version = 1
+
+[[fs_layer]]
+handled_access_fs = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/bin"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/usr"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/lib"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/lib64"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+[[fs_layer]]
+handled_access_fs = ["read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/etc"
+  allowed_access = ["read_file", "read_dir"]
+
+[[fs_layer]]
+handled_access_fs = ["write_file", "read_file", "read_dir", "make_dir",
+                     "make_reg", "remove_file", "remove_dir", "truncate"]
+
+  [[fs_layer.rule]]
+  path = "/tmp"
+  allowed_access = ["write_file", "read_file", "read_dir", "make_dir",
+                    "make_reg", "remove_file", "remove_dir", "truncate"]
+
+[net]
+handled_access_net = ["connect_tcp"]
+
+  [[net.rule]]
+  port = 80
+  allowed_access = ["connect_tcp"]
+
+  [[net.rule]]
+  port = 443
+  allowed_access = ["connect_tcp"]
+
+[broker]
+allow_read = ["/etc/resolv.conf", "/etc/hosts"]
+
+[seccomp]
+deny = ["ptrace", "bpf", "perf_event_open"]
+errno = 1

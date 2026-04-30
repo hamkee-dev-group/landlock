@@ -1,0 +1,72 @@
+version = 1
+
+
+
+
+
+[[fs_layer]]
+handled_access_fs = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/usr/bin"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/usr/lib"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/usr/lib64"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/lib"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/lib64"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+[[fs_layer]]
+handled_access_fs = ["read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/etc"
+  allowed_access = ["read_file", "read_dir"]
+
+[[fs_layer]]
+handled_access_fs = ["write_file", "read_file", "read_dir", "make_dir",
+                     "make_reg", "remove_file", "remove_dir", "truncate"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/tmp"
+  allowed_access = ["write_file", "read_file", "read_dir", "make_dir",
+                    "make_reg", "remove_file", "remove_dir", "truncate"]
+
+  [[fs_layer.rule]]
+  path = "/run/jobs/J/root/work"
+  allowed_access = ["write_file", "read_file", "read_dir", "make_dir",
+                    "make_reg", "remove_file", "remove_dir", "truncate"]
+
+[net]
+handled_access_net = ["connect_tcp"]
+
+  [[net.rule]]
+  port = 80
+  allowed_access = ["connect_tcp"]
+
+  [[net.rule]]
+  port = 443
+  allowed_access = ["connect_tcp"]
+
+[mount]
+proc = ["/run/jobs/J/root/proc"]
+
+[runtime]
+root = "/run/jobs/J/root"
+cwd = "/work"
+
+[seccomp]
+deny = ["ptrace", "bpf", "perf_event_open", "mount", "umount2", "pivot_root",
+        "open_tree", "move_mount", "fsopen", "fsmount", "mount_setattr"]
+errno = 1

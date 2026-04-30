@@ -1,0 +1,8 @@
+version = 1
+
+[net]
+handled_access_net = ["bind_tcp"]
+
+  [[net.rule]]
+  port = 99999
+  allowed_access = ["bind_tcp"]

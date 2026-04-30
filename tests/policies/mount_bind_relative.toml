@@ -1,0 +1,7 @@
+version = 1
+
+[mount]
+
+[[mount.bind]]
+source = "relative/source"
+target = "/tmp/absolute-target"

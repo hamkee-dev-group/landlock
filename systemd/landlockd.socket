@@ -1,0 +1,10 @@
+[Unit]
+Description=landlockd sandbox daemon socket
+
+[Socket]
+ListenStream=%t/landlockd.sock
+SocketMode=0600
+DirectoryMode=0700
+
+[Install]
+WantedBy=sockets.target

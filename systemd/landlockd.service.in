@@ -1,0 +1,7 @@
+[Unit]
+Description=landlockd sandbox daemon
+
+[Service]
+Type=simple
+ExecStart=@LANDLOCKD_EXECUTABLE@ serve --systemd
+NoNewPrivileges=yes

@@ -1,0 +1,7 @@
+version = 1
+
+[broker]
+  [[broker.mount_object]]
+  name = "scratch"
+  fs_type = "tmpfs"
+  attach = ["relative/path"]

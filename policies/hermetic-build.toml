@@ -1,0 +1,38 @@
+version = 1
+
+[[fs_layer]]
+handled_access_fs = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/bin"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/usr"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/lib"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/lib64"
+  allowed_access = ["execute", "read_file", "read_dir"]
+
+[[fs_layer]]
+handled_access_fs = ["read_file", "read_dir"]
+
+  [[fs_layer.rule]]
+  path = "/etc"
+  allowed_access = ["read_file", "read_dir"]
+
+[mount]
+tmpfs = ["/tmp/landlockd-work"]
+
+[runtime]
+cwd = "/tmp/landlockd-work"
+
+[seccomp]
+deny = ["ptrace", "bpf", "perf_event_open", "mount", "umount2", "pivot_root",
+        "open_tree", "move_mount", "fsopen", "fsmount", "mount_setattr"]
+errno = 1

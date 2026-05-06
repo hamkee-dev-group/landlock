@@ -348,6 +348,7 @@ static int load_net(const toml_table_t *net_tbl,
 static int load_broker_path_array(
     toml_array_t *paths_arr, struct landlockd_policy_ir *ir,
     const char *field_name, const char *file_path, FILE *err,
+    int absolute,
     int (*append_rule)(struct landlockd_policy_ir *ir, const char *path)) {
   toml_datum_t path_d;
   int n;
@@ -366,6 +367,12 @@ static int load_broker_path_array(
       }
       report(err, file_path, "broker.%s[%d]: expected a non-empty string",
              field_name, i);
+      return -1;
+    }
+    if (absolute && path_d.u.s[0] != '/') {
+      report(err, file_path, "broker.%s[%d]: expected an absolute path",
+             field_name, i);
+      free(path_d.u.s);
       return -1;
     }
     if (append_rule(ir, path_d.u.s) < 0) {
@@ -640,7 +647,7 @@ static int load_broker(const toml_table_t *broker_tbl,
                        const char *file_path, FILE *err) {
   static const char *const allowed[] = {"allow_read", "allow_write",
                                         "scratch", "export", "mount_tmpfs",
-                                        "mount_bind", "mount_object"};
+                                        "mount_bind", "mount_object", "addfd"};
   const char *offending;
   toml_array_t *allow_read_arr;
   toml_array_t *allow_write_arr;
@@ -649,6 +656,7 @@ static int load_broker(const toml_table_t *broker_tbl,
   toml_array_t *mount_tmpfs_arr;
   toml_array_t *mount_bind_arr;
   toml_array_t *mount_object_arr;
+  toml_array_t *addfd_arr;
 
   if (table_has_only_keys(broker_tbl, allowed,
                           sizeof(allowed) / sizeof(allowed[0]),
@@ -659,6 +667,7 @@ static int load_broker(const toml_table_t *broker_tbl,
 
   allow_read_arr = toml_array_in(broker_tbl, "allow_read");
   if (load_broker_path_array(allow_read_arr, ir, "allow_read", file_path, err,
+                             0,
                              landlockd_policy_ir_add_broker_open_read_rule) <
       0) {
     return -1;
@@ -666,29 +675,35 @@ static int load_broker(const toml_table_t *broker_tbl,
 
   allow_write_arr = toml_array_in(broker_tbl, "allow_write");
   if (load_broker_path_array(allow_write_arr, ir, "allow_write", file_path,
-                             err,
+                             err, 0,
                              landlockd_policy_ir_add_broker_open_write_rule) <
       0) {
     return -1;
   }
 
   scratch_arr = toml_array_in(broker_tbl, "scratch");
-  if (load_broker_path_array(scratch_arr, ir, "scratch", file_path, err,
+  if (load_broker_path_array(scratch_arr, ir, "scratch", file_path, err, 0,
                              landlockd_policy_ir_add_broker_scratch_rule) <
       0) {
     return -1;
   }
 
   export_arr = toml_array_in(broker_tbl, "export");
-  if (load_broker_path_array(export_arr, ir, "export", file_path, err,
+  if (load_broker_path_array(export_arr, ir, "export", file_path, err, 0,
                              landlockd_policy_ir_add_broker_export_rule) < 0) {
     return -1;
   }
 
   mount_tmpfs_arr = toml_array_in(broker_tbl, "mount_tmpfs");
   if (load_broker_path_array(
-      mount_tmpfs_arr, ir, "mount_tmpfs", file_path, err,
+      mount_tmpfs_arr, ir, "mount_tmpfs", file_path, err, 0,
       landlockd_policy_ir_add_broker_mount_tmpfs_rule) < 0) {
+    return -1;
+  }
+
+  addfd_arr = toml_array_in(broker_tbl, "addfd");
+  if (load_broker_path_array(addfd_arr, ir, "addfd", file_path, err, 1,
+                             landlockd_policy_ir_add_broker_addfd_rule) < 0) {
     return -1;
   }
 
@@ -1068,6 +1083,8 @@ int landlockd_policy_load_file_in_process(const char *file_path,
       out_ir->broker_mount_bind_rules != NULL ||
       out_ir->broker_mount_object_count != 0 ||
       out_ir->broker_mount_object_rules != NULL ||
+      out_ir->broker_addfd_count != 0 ||
+      out_ir->broker_addfd_rules != NULL ||
       out_ir->mount_tmpfs_count != 0 ||
       out_ir->mount_tmpfs_rules != NULL || out_ir->mount_bind_count != 0 ||
       out_ir->mount_bind_rules != NULL || out_ir->mount_proc_count != 0 ||

@@ -59,6 +59,7 @@ static void check_invalid(const char *dir, const char *leaf,
          ir.broker_mount_bind_rules == NULL &&
          ir.broker_mount_object_count == 0 &&
          ir.broker_mount_object_rules == NULL &&
+         ir.broker_addfd_count == 0 && ir.broker_addfd_rules == NULL &&
          ir.mount_tmpfs_count == 0 && ir.mount_tmpfs_rules == NULL &&
          ir.mount_bind_count == 0 && ir.mount_bind_rules == NULL &&
          ir.mount_proc_count == 0 && ir.mount_proc_rules == NULL &&
@@ -79,7 +80,7 @@ int main(int argc, char *argv[]) {
   char err[256];
   int rc;
 
-  plan(93);
+  plan(95);
 
   if (argc < 2) {
     diag("usage: %s <policies-dir>", argv[0]);
@@ -123,6 +124,7 @@ int main(int argc, char *argv[]) {
          ir.broker_mount_tmpfs_count == 0 &&
          ir.broker_mount_bind_count == 0 &&
          ir.broker_mount_object_count == 0 &&
+         ir.broker_addfd_count == 0 &&
          ir.mount_tmpfs_count == 0 && ir.mount_bind_count == 0 &&
          ir.mount_proc_count == 0 && ir.runtime_root == NULL &&
          ir.runtime_cwd == NULL &&
@@ -181,6 +183,17 @@ int main(int argc, char *argv[]) {
                 "/tmp/landlockd-broker-bind-target") == 0 &&
          ir.broker_mount_bind_rules[0].read_only == 1,
      "broker.mount_bind populates the dynamic bind mount list");
+  landlockd_policy_ir_reset(&ir);
+  free(broker_path);
+
+  broker_path = make_path(dir, "broker_addfd.toml");
+  landlockd_policy_ir_init(&ir);
+  memset(err, 0, sizeof(err));
+  rc = load_capturing(broker_path, &ir, err, sizeof(err));
+  ok(rc == 0, "broker addfd policy loads successfully");
+  ok(ir.broker_addfd_count == 1 &&
+         strcmp(ir.broker_addfd_rules[0].path, "/tmp/landlockd-addfd") == 0,
+     "broker.addfd populates the addfd path list");
   landlockd_policy_ir_reset(&ir);
   free(broker_path);
 
@@ -275,8 +288,8 @@ int main(int argc, char *argv[]) {
                 "relative runtime root path");
   check_invalid(dir, "runtime_cwd_relative.toml", "absolute path",
                 "relative runtime cwd path");
-  check_invalid(dir, "broker_addfd.toml", "addfd",
-                "unknown broker.addfd policy key");
+  check_invalid(dir, "broker_addfd_relative.toml", "absolute path",
+                "relative broker.addfd path");
   check_invalid(dir, "seccomp_unknown_syscall.toml", "unknown syscall",
                 "unknown seccomp syscall name");
   check_invalid(dir, "seccomp_bad_errno.toml", "out of range",

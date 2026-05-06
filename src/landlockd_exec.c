@@ -52,6 +52,8 @@ struct landlockd_broker_allowlist {
   size_t mount_bind_count;
   struct landlockd_policy_ir_mount_object_rule *mount_object_rules;
   size_t mount_object_count;
+  char **addfd_paths;
+  size_t addfd_count;
 };
 
 enum landlockd_broker_mount_fd_lease_kind {
@@ -554,6 +556,12 @@ static void landlockd_broker_allowlist_cleanup(
     }
     free(allowlist->mount_object_rules);
   }
+  if (allowlist->addfd_paths != NULL) {
+    for (i = 0; i < allowlist->addfd_count; i++) {
+      free(allowlist->addfd_paths[i]);
+    }
+    free(allowlist->addfd_paths);
+  }
   allowlist->read_paths = NULL;
   allowlist->read_count = 0;
   allowlist->write_paths = NULL;
@@ -568,6 +576,8 @@ static void landlockd_broker_allowlist_cleanup(
   allowlist->mount_bind_count = 0;
   allowlist->mount_object_rules = NULL;
   allowlist->mount_object_count = 0;
+  allowlist->addfd_paths = NULL;
+  allowlist->addfd_count = 0;
 }
 
 static void landlockd_broker_mount_fd_leases_cleanup(
@@ -900,6 +910,8 @@ static int landlockd_broker_allowlist_init(
   allowlist->mount_bind_count = 0;
   allowlist->mount_object_rules = NULL;
   allowlist->mount_object_count = 0;
+  allowlist->addfd_paths = NULL;
+  allowlist->addfd_count = 0;
 
   if (landlockd_broker_canonicalize_rules(
           ir->broker_open_read_rules, ir->broker_open_read_count,
@@ -940,6 +952,12 @@ static int landlockd_broker_allowlist_init(
   if (landlockd_broker_canonicalize_mount_object_rules(
           ir->broker_mount_object_rules, ir->broker_mount_object_count,
           &allowlist->mount_object_rules, &allowlist->mount_object_count) < 0) {
+    landlockd_broker_allowlist_cleanup(allowlist);
+    return -1;
+  }
+  if (landlockd_broker_canonicalize_rules(
+          ir->broker_addfd_rules, ir->broker_addfd_count,
+          &allowlist->addfd_paths, &allowlist->addfd_count) < 0) {
     landlockd_broker_allowlist_cleanup(allowlist);
     return -1;
   }

@@ -64,6 +64,10 @@ void landlockd_policy_ir_reset(struct landlockd_policy_ir *ir) {
     free(ir->broker_mount_object_rules[i].attach_paths);
   }
   free(ir->broker_mount_object_rules);
+  for (i = 0; i < ir->broker_addfd_count; i++) {
+    free(ir->broker_addfd_rules[i].path);
+  }
+  free(ir->broker_addfd_rules);
   for (i = 0; i < ir->mount_tmpfs_count; i++) {
     free(ir->mount_tmpfs_rules[i].path);
   }
@@ -415,6 +419,34 @@ fail:
   return -1;
 }
 
+int landlockd_policy_ir_add_broker_addfd_rule(
+    struct landlockd_policy_ir *ir, const char *path) {
+  struct landlockd_policy_ir_broker_open_rule *grown;
+  char *path_copy;
+
+  if (ir == NULL || path == NULL || path[0] == '\0') {
+    errno = EINVAL;
+    return -1;
+  }
+
+  path_copy = strdup(path);
+  if (path_copy == NULL) {
+    return -1;
+  }
+
+  grown = realloc(ir->broker_addfd_rules,
+                  (ir->broker_addfd_count + 1) * sizeof(*grown));
+  if (grown == NULL) {
+    free(path_copy);
+    return -1;
+  }
+
+  ir->broker_addfd_rules = grown;
+  grown[ir->broker_addfd_count].path = path_copy;
+  ir->broker_addfd_count++;
+  return 0;
+}
+
 int landlockd_policy_ir_add_mount_tmpfs_rule(struct landlockd_policy_ir *ir,
                                              const char *path) {
   struct landlockd_policy_ir_mount_rule *grown;
@@ -605,6 +637,8 @@ int landlockd_policy_ir_copy(const struct landlockd_policy_ir *src,
       dst->broker_mount_bind_rules != NULL ||
       dst->broker_mount_object_count != 0 ||
       dst->broker_mount_object_rules != NULL ||
+      dst->broker_addfd_count != 0 ||
+      dst->broker_addfd_rules != NULL ||
       dst->mount_tmpfs_count != 0 ||
       dst->mount_tmpfs_rules != NULL || dst->mount_bind_count != 0 ||
       dst->mount_bind_rules != NULL || dst->mount_proc_count != 0 ||
@@ -799,6 +833,22 @@ int landlockd_policy_ir_copy(const struct landlockd_policy_ir *src,
         if (dst->broker_mount_object_rules[i].attach_paths[j] == NULL) {
           goto fail;
         }
+      }
+    }
+  }
+
+  if (src->broker_addfd_count > 0) {
+    dst->broker_addfd_rules =
+        calloc(src->broker_addfd_count, sizeof(*dst->broker_addfd_rules));
+    if (dst->broker_addfd_rules == NULL) {
+      goto fail;
+    }
+    dst->broker_addfd_count = src->broker_addfd_count;
+    for (i = 0; i < src->broker_addfd_count; i++) {
+      dst->broker_addfd_rules[i].path =
+          strdup(src->broker_addfd_rules[i].path);
+      if (dst->broker_addfd_rules[i].path == NULL) {
+        goto fail;
       }
     }
   }

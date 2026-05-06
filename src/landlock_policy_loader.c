@@ -14,7 +14,7 @@
 #include <unistd.h>
 
 #define LANDLOCKD_POLICY_WIRE_MAGIC 0x4c504c44u
-#define LANDLOCKD_POLICY_WIRE_VERSION 13u
+#define LANDLOCKD_POLICY_WIRE_VERSION 14u
 
 #ifdef LANDLOCKD_POLICY_LOADER_USE_HELPER
 static int helper_path_exists(const char *path) {
@@ -213,6 +213,7 @@ static int write_ir(int fd, const struct landlockd_policy_ir *ir) {
       write_u32(fd, (uint32_t)ir->broker_mount_tmpfs_count) < 0 ||
       write_u32(fd, (uint32_t)ir->broker_mount_bind_count) < 0 ||
       write_u32(fd, (uint32_t)ir->broker_mount_object_count) < 0 ||
+      write_u32(fd, (uint32_t)ir->broker_addfd_count) < 0 ||
       write_u32(fd, (uint32_t)ir->mount_tmpfs_count) < 0 ||
       write_u32(fd, (uint32_t)ir->mount_bind_count) < 0 ||
       write_u32(fd, (uint32_t)ir->mount_proc_count) < 0 ||
@@ -336,6 +337,14 @@ static int write_ir(int fd, const struct landlockd_policy_ir *ir) {
     }
   }
 
+  for (i = 0; i < ir->broker_addfd_count; i++) {
+    path_len = (uint32_t)strlen(ir->broker_addfd_rules[i].path);
+    if (write_u32(fd, path_len) < 0 ||
+        write_all(fd, ir->broker_addfd_rules[i].path, path_len) < 0) {
+      return -1;
+    }
+  }
+
   for (i = 0; i < ir->mount_tmpfs_count; i++) {
     path_len = (uint32_t)strlen(ir->mount_tmpfs_rules[i].path);
     if (write_u32(fd, path_len) < 0 ||
@@ -451,6 +460,7 @@ static int load_ir_from_wire(const unsigned char *buf, size_t len,
   uint32_t broker_mount_tmpfs_count;
   uint32_t broker_mount_bind_count;
   uint32_t broker_mount_object_count;
+  uint32_t broker_addfd_count;
   uint32_t mount_tmpfs_count;
   uint32_t mount_bind_count;
   uint32_t mount_proc_count;
@@ -486,6 +496,7 @@ static int load_ir_from_wire(const unsigned char *buf, size_t len,
       read_u32_buf(buf, len, &off, &broker_mount_tmpfs_count) < 0 ||
       read_u32_buf(buf, len, &off, &broker_mount_bind_count) < 0 ||
       read_u32_buf(buf, len, &off, &broker_mount_object_count) < 0 ||
+      read_u32_buf(buf, len, &off, &broker_addfd_count) < 0 ||
       read_u32_buf(buf, len, &off, &mount_tmpfs_count) < 0 ||
       read_u32_buf(buf, len, &off, &mount_bind_count) < 0 ||
       read_u32_buf(buf, len, &off, &mount_proc_count) < 0 ||
@@ -787,6 +798,27 @@ fail_mount_object:
     return -1;
   }
 
+  for (i = 0; i < broker_addfd_count; i++) {
+    if (read_u32_buf(buf, len, &off, &path_len) < 0 || off + path_len > len) {
+      errno = EINVAL;
+      return -1;
+    }
+    path = malloc((size_t)path_len + 1);
+    if (path == NULL) {
+      return -1;
+    }
+    memcpy(path, buf + off, path_len);
+    path[path_len] = '\0';
+    off += path_len;
+    if (landlockd_policy_ir_add_broker_addfd_rule(out_ir, path) < 0) {
+      saved_errno = errno;
+      free(path);
+      errno = saved_errno;
+      return -1;
+    }
+    free(path);
+  }
+
   for (i = 0; i < mount_tmpfs_count; i++) {
     if (read_u32_buf(buf, len, &off, &path_len) < 0 || off + path_len > len) {
       errno = EINVAL;
@@ -988,6 +1020,8 @@ int landlockd_policy_load_file(const char *file_path,
       out_ir->broker_mount_bind_rules != NULL ||
       out_ir->broker_mount_object_count != 0 ||
       out_ir->broker_mount_object_rules != NULL ||
+      out_ir->broker_addfd_count != 0 ||
+      out_ir->broker_addfd_rules != NULL ||
       out_ir->mount_tmpfs_count != 0 ||
       out_ir->mount_tmpfs_rules != NULL || out_ir->mount_bind_count != 0 ||
       out_ir->mount_bind_rules != NULL || out_ir->mount_proc_count != 0 ||

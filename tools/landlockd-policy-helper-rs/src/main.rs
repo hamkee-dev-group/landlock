@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::process;
 
 const LANDLOCKD_POLICY_WIRE_MAGIC: u32 = 0x4c50_4c44;
-const LANDLOCKD_POLICY_WIRE_VERSION: u32 = 13;
+const LANDLOCKD_POLICY_WIRE_VERSION: u32 = 14;
 const DEFAULT_SECCOMP_ERRNO: u16 = 1;
 
 const ACCESS_EXECUTE: u64 = 1u64 << 0;
@@ -44,6 +44,7 @@ struct PolicyIr {
     broker_mount_tmpfs: Vec<String>,
     broker_mount_bind: Vec<BindMountIr>,
     broker_mount_object: Vec<MountObjectIr>,
+    broker_addfd: Vec<String>,
     mount_tmpfs: Vec<String>,
     mount_bind: Vec<BindMountIr>,
     mount_proc: Vec<String>,
@@ -135,6 +136,7 @@ struct BrokerDoc {
     mount_tmpfs: Option<Vec<String>>,
     mount_bind: Option<Vec<BindMountDoc>>,
     mount_object: Option<Vec<MountObjectDoc>>,
+    addfd: Option<Vec<String>>,
 }
 
 #[derive(Deserialize)]
@@ -436,6 +438,7 @@ fn build_ir(doc: PolicyDoc) -> Result<PolicyIr, String> {
         ir.broker_mount_bind = parse_bind_list(broker.mount_bind, "broker.mount_bind")?;
         ir.broker_mount_object =
             parse_mount_object_list(broker.mount_object, "broker.mount_object")?;
+        ir.broker_addfd = parse_path_list(broker.addfd, "broker.addfd", true)?;
     }
 
     if let Some(mount) = doc.mount {
@@ -520,6 +523,7 @@ fn write_ir<W: Write>(writer: &mut W, ir: &PolicyIr) -> io::Result<()> {
     write_u32(writer, ir.broker_mount_tmpfs.len() as u32)?;
     write_u32(writer, ir.broker_mount_bind.len() as u32)?;
     write_u32(writer, ir.broker_mount_object.len() as u32)?;
+    write_u32(writer, ir.broker_addfd.len() as u32)?;
     write_u32(writer, ir.mount_tmpfs.len() as u32)?;
     write_u32(writer, ir.mount_bind.len() as u32)?;
     write_u32(writer, ir.mount_proc.len() as u32)?;
@@ -584,6 +588,9 @@ fn write_ir<W: Write>(writer: &mut W, ir: &PolicyIr) -> io::Result<()> {
         for path in &obj.attach {
             write_len_prefixed_string(writer, path)?;
         }
+    }
+    for path in &ir.broker_addfd {
+        write_len_prefixed_string(writer, path)?;
     }
     for path in &ir.mount_tmpfs {
         write_len_prefixed_string(writer, path)?;

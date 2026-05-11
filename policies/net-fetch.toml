@@ -48,6 +48,7 @@ handled_access_net = ["connect_tcp"]
 
 [broker]
 allow_read = ["/etc/resolv.conf", "/etc/hosts"]
+addfd = ["/etc/resolv.conf", "/etc/hosts"]
 
 [seccomp]
 deny = ["ptrace", "bpf", "perf_event_open"]

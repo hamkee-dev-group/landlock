@@ -120,6 +120,9 @@ test_cli_notify_fd_helper_source = files(
 test_cli_broker_live_source = files(
   'test_cli_broker_live.c')
 
+test_cli_broker_addfd_live_source = files(
+  'test_cli_broker_addfd_live.c')
+
 test_cli_broker_mount_live_source = files(
   'test_cli_broker_mount_live.c')
 
@@ -243,7 +246,7 @@ test_cli_policy_run_fs_only_source = files(
 test_cli_policy_file_run_fs_only_source = files(
   'test_cli_policy_file_run_fs_only.c')
 
-lint_test_sources = landlock_test_sources + test_probe_abi_source + test_seccomp_probe_user_notif_source + test_seccomp_notify_probe_source + test_add_rule_fs_delegate_source + test_add_rule_fs_empty_access_source + test_add_net_rule_contract_source + test_add_rule_fs_parent_fd_zero_source + test_add_rule_fs_high_bits_source + test_add_rule_fs_eacces_source + test_add_rule_fs_enomem_source + test_add_fs_rule_live_source + test_create_fs_ruleset_live_source + test_create_net_ruleset_live_source + test_restrict_self_with_no_new_privs_source + test_set_no_new_privs_source + test_restrict_self_invalid_flags_source + test_restrict_self_require_nnp_source + test_restrict_self_warn_e2big_source + test_cli_parse_source + test_cli_policy_parse_source + test_cli_named_policy_source + test_cli_build_fs_ruleset_source + test_cli_smoke_source + test_docs_audit_schema_source + test_cli_exec_live_source + test_cli_e2e_source + test_cli_ir_deterministic_source + test_cli_dry_run_source + test_cli_dry_run_stable_source + test_cli_dry_run_abi_source + test_cli_dry_run_net_unsupported_source + test_cli_preflight_negatives_source + test_cli_preflight_diag_source + test_cli_launch_status_source + test_cli_broker_live_source + test_cli_broker_mount_live_source + test_cli_broker_bind_live_source + test_cli_broker_move_mount_live_source + test_cli_broker_mount_fd_live_source + test_cli_broker_mount_object_live_source + test_cli_hardening_live_source + test_cli_audit_live_source + test_cli_seccomp_live_source + test_cli_tmpfs_live_source + test_cli_mount_hardening_live_source + test_cli_bind_mount_live_source + test_cli_root_pivot_live_source + test_cli_daemon_socket_activation_live_source + test_cli_daemon_status_live_source + test_cli_kernel_unsupported_source + test_cli_notify_preflight_diag_source + test_cli_notify_preflight_einval_source + test_cli_signal_live_source + test_cli_prepared_root_lint_source + test_preflight_source + test_preflight_seccomp_source + test_landlock_policy_source + test_policy_ir_source + test_policy_compile_source + test_policy_compiler_source + test_policy_compiler_exceptions_source + test_seccomp_plan_source + test_seccomp_hardening_source + test_seccomp_install_failclosed_source + test_seccomp_notify_live_source + test_apply_sandbox_with_seccomp_source + test_policy_loader_source + test_policy_loader_mode_source + test_policy_loader_rust_helper_source + test_cli_policy_helper_exec_failure_source + test_cli_policy_file_failclosed_source + test_cli_policy_run_net_unsupported_source + test_cli_policy_run_fs_only_source + test_cli_policy_file_run_fs_only_source
+lint_test_sources = landlock_test_sources + test_probe_abi_source + test_seccomp_probe_user_notif_source + test_seccomp_notify_probe_source + test_add_rule_fs_delegate_source + test_add_rule_fs_empty_access_source + test_add_net_rule_contract_source + test_add_rule_fs_parent_fd_zero_source + test_add_rule_fs_high_bits_source + test_add_rule_fs_eacces_source + test_add_rule_fs_enomem_source + test_add_fs_rule_live_source + test_create_fs_ruleset_live_source + test_create_net_ruleset_live_source + test_restrict_self_with_no_new_privs_source + test_set_no_new_privs_source + test_restrict_self_invalid_flags_source + test_restrict_self_require_nnp_source + test_restrict_self_warn_e2big_source + test_cli_parse_source + test_cli_policy_parse_source + test_cli_named_policy_source + test_cli_build_fs_ruleset_source + test_cli_smoke_source + test_docs_audit_schema_source + test_cli_exec_live_source + test_cli_e2e_source + test_cli_ir_deterministic_source + test_cli_dry_run_source + test_cli_dry_run_stable_source + test_cli_dry_run_abi_source + test_cli_dry_run_net_unsupported_source + test_cli_preflight_negatives_source + test_cli_preflight_diag_source + test_cli_launch_status_source + test_cli_broker_live_source + test_cli_broker_addfd_live_source + test_cli_broker_mount_live_source + test_cli_broker_bind_live_source + test_cli_broker_move_mount_live_source + test_cli_broker_mount_fd_live_source + test_cli_broker_mount_object_live_source + test_cli_hardening_live_source + test_cli_audit_live_source + test_cli_seccomp_live_source + test_cli_tmpfs_live_source + test_cli_mount_hardening_live_source + test_cli_bind_mount_live_source + test_cli_root_pivot_live_source + test_cli_daemon_socket_activation_live_source + test_cli_daemon_status_live_source + test_cli_kernel_unsupported_source + test_cli_notify_preflight_diag_source + test_cli_notify_preflight_einval_source + test_cli_signal_live_source + test_cli_prepared_root_lint_source + test_preflight_source + test_preflight_seccomp_source + test_landlock_policy_source + test_policy_ir_source + test_policy_compile_source + test_policy_compiler_source + test_policy_compiler_exceptions_source + test_seccomp_plan_source + test_seccomp_hardening_source + test_seccomp_install_failclosed_source + test_seccomp_notify_live_source + test_apply_sandbox_with_seccomp_source + test_policy_loader_source + test_policy_loader_mode_source + test_policy_loader_rust_helper_source + test_cli_policy_helper_exec_failure_source + test_cli_policy_file_failclosed_source + test_cli_policy_run_net_unsupported_source + test_cli_policy_run_fs_only_source + test_cli_policy_file_run_fs_only_source
 
 test_abi_version = executable('test_abi_version',
   landlock_test_sources[0],
@@ -596,6 +599,16 @@ test_cli_broker_live = executable('test_cli_broker_live',
   dependencies : libtap_dep)
 
 test('cli_broker_live', test_cli_broker_live,
+  args : [landlockd_exe, test_cli_broker_open_helper],
+  protocol : 'tap', suite : 'live')
+
+test_cli_broker_addfd_live = executable('test_cli_broker_addfd_live',
+  test_cli_broker_addfd_live_source,
+  include_directories : inc,
+  link_with : liblandlock,
+  dependencies : libtap_dep)
+
+test('cli_broker_addfd_live', test_cli_broker_addfd_live,
   args : [landlockd_exe, test_cli_broker_open_helper],
   protocol : 'tap', suite : 'live')
 

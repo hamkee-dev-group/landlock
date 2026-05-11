@@ -3510,6 +3510,14 @@ static int landlockd_broker_handle_scratch_open(
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
 
+  if (!landlockd_broker_path_under_list(allowlist->addfd_paths,
+                                        allowlist->addfd_count,
+                                        canonical_path)) {
+    landlockd_audit_broker_open(diag, req, canonical_path, "scratch",
+                                operation_name, "deny", EACCES);
+    return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
+  }
+
   parent_fd = open(canonical_parent, O_PATH | O_DIRECTORY | O_CLOEXEC);
   if (parent_fd < 0) {
     error_value = errno;
@@ -4060,6 +4068,15 @@ static int landlockd_broker_handle_open_request(
                                                   dirfd, flags, mode, diag,
                                                   resolve);
     }
+    landlockd_audit_broker_open(diag, req, canonical_path, "exception",
+                                landlockd_open_access_name(access_mode), "deny",
+                                EACCES);
+    return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
+  }
+
+  if (!landlockd_broker_path_under_list(allowlist->addfd_paths,
+                                        allowlist->addfd_count,
+                                        canonical_path)) {
     landlockd_audit_broker_open(diag, req, canonical_path, "exception",
                                 landlockd_open_access_name(access_mode), "deny",
                                 EACCES);

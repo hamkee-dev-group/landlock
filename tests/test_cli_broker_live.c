@@ -165,12 +165,14 @@ static int write_policy(const char *policy_path, const char *helper_dir,
             return -1;
         }
         if (allow_read &&
-            fprintf(fp, "allow_read = [\"%s\"]\n", read_target) < 0) {
+            (fprintf(fp, "allow_read = [\"%s\"]\n", read_target) < 0 ||
+             fprintf(fp, "addfd = [\"%s\"]\n", read_target) < 0)) {
             fclose(fp);
             return -1;
         }
         if (allow_write &&
-            fprintf(fp, "allow_write = [\"%s\"]\n", write_target) < 0) {
+            (fprintf(fp, "allow_write = [\"%s\"]\n", write_target) < 0 ||
+             fprintf(fp, "addfd = [\"%s\"]\n", write_target) < 0)) {
             fclose(fp);
             return -1;
         }
@@ -399,8 +401,9 @@ int main(int argc, char *argv[])
         FILE *fp = fopen(policy_with_scratch_broker, "a");
         if (fp == NULL ||
             fprintf(fp, "\n[broker]\n"
-                        "scratch = [\"%s\"]\n",
-                        scratch_root) < 0) {
+                        "scratch = [\"%s\"]\n"
+                        "addfd = [\"%s\"]\n",
+                        scratch_root, scratch_root) < 0) {
             diag("writing scratch policy failed: %s", strerror(errno));
             if (fp != NULL) {
                 fclose(fp);
@@ -414,8 +417,9 @@ int main(int argc, char *argv[])
         if (fp == NULL ||
             fprintf(fp, "\n[broker]\n"
                         "scratch = [\"%s\"]\n"
-                        "export = [\"%s\"]\n",
-                        scratch_root, export_root) < 0) {
+                        "export = [\"%s\"]\n"
+                        "addfd = [\"%s\"]\n",
+                        scratch_root, export_root, scratch_root) < 0) {
             diag("writing export policy failed: %s", strerror(errno));
             if (fp != NULL) {
                 fclose(fp);

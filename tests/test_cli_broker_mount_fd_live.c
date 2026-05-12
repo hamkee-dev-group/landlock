@@ -296,7 +296,7 @@ static int maybe_emit_rule(FILE *fp, const char *path, const char *access_list) 
 static int write_policy(const char *policy_path, const char *helper_dir,
                         const char *target_ro_dir, const char *target_rw_dir,
                         const char *source_ro_dir, const char *source_rw_dir,
-                        int with_bind_broker) {
+                        int with_bind_broker, int with_addfd) {
   FILE *fp;
 
   fp = fopen(policy_path, "w");
@@ -324,9 +324,18 @@ static int write_policy(const char *policy_path, const char *helper_dir,
     return -1;
   }
 
+  if (with_bind_broker && fprintf(fp, "\n[broker]\n") < 0) {
+    fclose(fp);
+    return -1;
+  }
+  if (with_bind_broker && with_addfd &&
+      fprintf(fp, "addfd = [\"%s\", \"%s\"]\n", source_ro_dir, source_rw_dir) <
+          0) {
+    fclose(fp);
+    return -1;
+  }
   if (with_bind_broker &&
       fprintf(fp,
-              "\n[broker]\n"
               "  [[broker.mount_bind]]\n"
               "  source = \"%s\"\n"
               "  target = \"%s\"\n"
@@ -415,8 +424,10 @@ int main(int argc, char *argv[]) {
   char denied_target_file[PATH_MAX];
   char policy_without_bind[PATH_MAX];
   char policy_with_bind[PATH_MAX];
+  char policy_with_bind_no_addfd[PATH_MAX];
   char socket_path[PATH_MAX];
   char *direct_no_broker_argv[11];
+  char *direct_no_addfd_argv[11];
   char *direct_ro_read_argv[11];
   char *direct_ro_write_argv[11];
   char *direct_rw_write_argv[11];
@@ -474,6 +485,9 @@ int main(int argc, char *argv[]) {
       snprintf(policy_with_bind, sizeof(policy_with_bind),
                "%s/with-broker-bind.toml", tempdir) >=
           (int)sizeof(policy_with_bind) ||
+      snprintf(policy_with_bind_no_addfd, sizeof(policy_with_bind_no_addfd),
+               "%s/with-broker-bind-no-addfd.toml", tempdir) >=
+          (int)sizeof(policy_with_bind_no_addfd) ||
       snprintf(socket_path, sizeof(socket_path), "%s/landlockd.sock", tempdir) >=
           (int)sizeof(socket_path)) {
     diag("path too long");
@@ -490,14 +504,16 @@ int main(int argc, char *argv[]) {
   }
 
   if (write_policy(policy_without_bind, helper_dir, target_ro_dir, target_rw_dir,
-                   source_ro_dir, source_rw_dir, 0) < 0 ||
+                   source_ro_dir, source_rw_dir, 0, 0) < 0 ||
       write_policy(policy_with_bind, helper_dir, target_ro_dir, target_rw_dir,
-                   source_ro_dir, source_rw_dir, 1) < 0) {
+                   source_ro_dir, source_rw_dir, 1, 1) < 0 ||
+      write_policy(policy_with_bind_no_addfd, helper_dir, target_ro_dir,
+                   target_rw_dir, source_ro_dir, source_rw_dir, 1, 0) < 0) {
     diag("cannot write broker mount-fd policies: %s", strerror(errno));
     return 1;
   }
 
-  plan(10);
+  plan(11);
 
   direct_no_broker_argv[0] = argv[1];
   direct_no_broker_argv[1] = "run";
@@ -513,6 +529,21 @@ int main(int argc, char *argv[]) {
   ok(run_landlockd(argv[1], direct_no_broker_argv, &status) == 0 &&
          WIFEXITED(status) && WEXITSTATUS(status) == 18,
      "without a broker bind rule, runtime open_tree requests fail closed");
+
+  direct_no_addfd_argv[0] = argv[1];
+  direct_no_addfd_argv[1] = "run";
+  direct_no_addfd_argv[2] = "--policy-file";
+  direct_no_addfd_argv[3] = policy_with_bind_no_addfd;
+  direct_no_addfd_argv[4] = "--";
+  direct_no_addfd_argv[5] = argv[2];
+  direct_no_addfd_argv[6] = source_ro_dir;
+  direct_no_addfd_argv[7] = target_ro_dir;
+  direct_no_addfd_argv[8] = target_ro_file;
+  direct_no_addfd_argv[9] = "open-tree-move-read-cycle";
+  direct_no_addfd_argv[10] = NULL;
+  ok(run_landlockd(argv[1], direct_no_addfd_argv, &status) == 0 &&
+         WIFEXITED(status) && WEXITSTATUS(status) == 18,
+     "without a broker.addfd entry, brokered open_tree requests fail closed");
 
   direct_ro_read_argv[0] = argv[1];
   direct_ro_read_argv[1] = "run";

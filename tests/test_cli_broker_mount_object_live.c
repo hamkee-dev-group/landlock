@@ -77,7 +77,8 @@ static int maybe_emit_rule(FILE *fp, const char *path, const char *access_list) 
 }
 
 static int write_policy(const char *policy_path, const char *helper_dir,
-                        const char *target_dir, int with_object) {
+                        const char *target_dir, int with_object,
+                        int with_addfd) {
   FILE *fp;
 
   fp = fopen(policy_path, "w");
@@ -107,9 +108,17 @@ static int write_policy(const char *policy_path, const char *helper_dir,
     return -1;
   }
 
+  if (with_object && fprintf(fp, "\n[broker]\n") < 0) {
+    fclose(fp);
+    return -1;
+  }
+  if (with_object && with_addfd &&
+      fprintf(fp, "addfd = [\"%s\"]\n", target_dir) < 0) {
+    fclose(fp);
+    return -1;
+  }
   if (with_object &&
       fprintf(fp,
-              "\n[broker]\n"
               "  [[broker.mount_object]]\n"
               "  name = \"scratch\"\n"
               "  fs_type = \"tmpfs\"\n"
@@ -382,8 +391,10 @@ int main(int argc, char *argv[]) {
   char denied_target_file[PATH_MAX];
   char policy_without_object[PATH_MAX];
   char policy_with_object[PATH_MAX];
+  char policy_with_object_no_addfd[PATH_MAX];
   char socket_path[PATH_MAX];
   char *direct_no_object_argv[11];
+  char *direct_no_addfd_argv[11];
   char *direct_create_argv[11];
   char *direct_setattr_argv[11];
   char *direct_denied_argv[11];
@@ -428,6 +439,10 @@ int main(int argc, char *argv[]) {
       snprintf(policy_with_object, sizeof(policy_with_object),
                "%s/with-object.toml", tempdir) >=
           (int)sizeof(policy_with_object) ||
+      snprintf(policy_with_object_no_addfd,
+               sizeof(policy_with_object_no_addfd),
+               "%s/with-object-no-addfd.toml", tempdir) >=
+          (int)sizeof(policy_with_object_no_addfd) ||
       snprintf(socket_path, sizeof(socket_path), "%s/landlockd.sock", tempdir) >=
           (int)sizeof(socket_path)) {
     diag("path too long");
@@ -437,13 +452,15 @@ int main(int argc, char *argv[]) {
     diag("setup failed: %s", strerror(errno));
     return 1;
   }
-  if (write_policy(policy_without_object, helper_dir, target_dir, 0) < 0 ||
-      write_policy(policy_with_object, helper_dir, target_dir, 1) < 0) {
+  if (write_policy(policy_without_object, helper_dir, target_dir, 0, 0) < 0 ||
+      write_policy(policy_with_object, helper_dir, target_dir, 1, 1) < 0 ||
+      write_policy(policy_with_object_no_addfd, helper_dir, target_dir, 1, 0) <
+          0) {
     diag("cannot write mount-object policies: %s", strerror(errno));
     return 1;
   }
 
-  plan(9);
+  plan(10);
 
   direct_no_object_argv[0] = argv[1];
   direct_no_object_argv[1] = "run";
@@ -459,6 +476,21 @@ int main(int argc, char *argv[]) {
   ok(run_landlockd(argv[1], direct_no_object_argv, &status) == 0 &&
          WIFEXITED(status) && WEXITSTATUS(status) == 19,
      "without a mount object rule, fsopen requests fail closed");
+
+  direct_no_addfd_argv[0] = argv[1];
+  direct_no_addfd_argv[1] = "run";
+  direct_no_addfd_argv[2] = "--policy-file";
+  direct_no_addfd_argv[3] = policy_with_object_no_addfd;
+  direct_no_addfd_argv[4] = "--";
+  direct_no_addfd_argv[5] = argv[2];
+  direct_no_addfd_argv[6] = "scratch";
+  direct_no_addfd_argv[7] = target_dir;
+  direct_no_addfd_argv[8] = target_file;
+  direct_no_addfd_argv[9] = "fsopen-fsmount-create-cycle";
+  direct_no_addfd_argv[10] = NULL;
+  ok(run_landlockd(argv[1], direct_no_addfd_argv, &status) == 0 &&
+         WIFEXITED(status) && WEXITSTATUS(status) == 19,
+     "without a broker.addfd entry, brokered fsopen requests fail closed");
 
   direct_create_argv[0] = argv[1];
   direct_create_argv[1] = "run";

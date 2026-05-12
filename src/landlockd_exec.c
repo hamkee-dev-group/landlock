@@ -2127,6 +2127,23 @@ static int landlockd_broker_path_under_list(char *const *paths, size_t count,
   return 0;
 }
 
+static int landlockd_broker_mount_object_addfd_covers(
+    char *const *addfd_paths, size_t addfd_count,
+    const struct landlockd_policy_ir_mount_object_rule *rule) {
+  size_t i;
+
+  if (rule->attach_count == 0) {
+    return 0;
+  }
+  for (i = 0; i < rule->attach_count; i++) {
+    if (!landlockd_broker_path_under_list(addfd_paths, addfd_count,
+                                          rule->attach_paths[i])) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 static int landlockd_broker_is_allowed(
     const struct landlockd_broker_allowlist *allowlist,
     const char *canonical_path, int access_mode) {
@@ -2771,6 +2788,13 @@ static int landlockd_broker_handle_fsopen_request(
                                  "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
+  if (!landlockd_broker_mount_object_addfd_covers(allowlist->addfd_paths,
+                                                  allowlist->addfd_count,
+                                                  rule)) {
+    landlockd_audit_broker_mount(diag, "broker.fsopen", req, object_name,
+                                 "deny", EACCES);
+    return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
+  }
 
   token_fd = open("/dev/null",
                   O_RDONLY | (((flags & FSOPEN_CLOEXEC) != 0U) ? O_CLOEXEC : 0));
@@ -2889,6 +2913,14 @@ static int landlockd_broker_handle_fsmount_request(
     free(object_name);
     landlockd_audit_broker_mount(diag, "broker.fsmount", req, NULL, "deny",
                                  EACCES);
+    return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
+  }
+  if (!landlockd_broker_mount_object_addfd_covers(allowlist->addfd_paths,
+                                                  allowlist->addfd_count,
+                                                  rule)) {
+    free(object_name);
+    landlockd_audit_broker_mount(diag, "broker.fsmount", req, rule->name,
+                                 "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
   local_fd = landlockd_broker_fsmount_in_tracee_namespace(req->pid, rule->fs_type,
@@ -3054,6 +3086,13 @@ static int landlockd_broker_handle_open_tree_request(
     }
   }
   if (i == allowlist->mount_bind_count) {
+    landlockd_audit_broker_mount(diag, "broker.open_tree", req,
+                                 canonical_source, "deny", EACCES);
+    return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
+  }
+  if (!landlockd_broker_path_under_list(allowlist->addfd_paths,
+                                        allowlist->addfd_count,
+                                        canonical_source)) {
     landlockd_audit_broker_mount(diag, "broker.open_tree", req,
                                  canonical_source, "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);

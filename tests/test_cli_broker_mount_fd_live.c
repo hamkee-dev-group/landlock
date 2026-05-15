@@ -329,8 +329,14 @@ static int write_policy(const char *policy_path, const char *helper_dir,
     return -1;
   }
   if (with_bind_broker && with_addfd &&
-      fprintf(fp, "addfd = [\"%s\", \"%s\"]\n", source_ro_dir, source_rw_dir) <
-          0) {
+      fprintf(fp,
+              "  [[broker.addfd]]\n"
+              "  action = \"open_tree\"\n"
+              "  target = \"%s\"\n"
+              "  [[broker.addfd]]\n"
+              "  action = \"open_tree\"\n"
+              "  target = \"%s\"\n",
+              source_ro_dir, source_rw_dir) < 0) {
     fclose(fp);
     return -1;
   }
@@ -513,7 +519,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  plan(11);
+  plan(13);
 
   direct_no_broker_argv[0] = argv[1];
   direct_no_broker_argv[1] = "run";
@@ -545,6 +551,10 @@ int main(int argc, char *argv[]) {
          WIFEXITED(status) && WEXITSTATUS(status) == 18,
      "without a broker.addfd entry, brokered open_tree requests fail closed");
 
+  ok(run_landlockd(argv[1], direct_no_addfd_argv, &status) == 0 &&
+         WIFEXITED(status) && WEXITSTATUS(status) == 18,
+     "brokered open_tree addfd requires broker.addfd open_tree declaration");
+
   direct_ro_read_argv[0] = argv[1];
   direct_ro_read_argv[1] = "run";
   direct_ro_read_argv[2] = "--policy-file";
@@ -560,6 +570,11 @@ int main(int argc, char *argv[]) {
          WIFEXITED(status) && WEXITSTATUS(status) == 0 &&
          access(target_ro_file, F_OK) < 0 && errno == ENOENT,
      "brokered mount-fd move_mount requests succeed and remain ephemeral");
+
+  ok(run_landlockd(argv[1], direct_ro_read_argv, &status) == 0 &&
+         WIFEXITED(status) && WEXITSTATUS(status) == 0 &&
+         access(target_ro_file, F_OK) < 0 && errno == ENOENT,
+     "declared broker.addfd open_tree permits brokered open_tree of bound source");
 
   direct_ro_write_argv[0] = argv[1];
   direct_ro_write_argv[1] = "run";

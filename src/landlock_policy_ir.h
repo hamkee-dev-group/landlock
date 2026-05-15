@@ -24,6 +24,12 @@ struct landlockd_policy_ir_broker_open_rule {
   char *path;
 };
 
+struct landlockd_policy_ir_broker_addfd_rule {
+  char *action;
+  char *target;
+  char *mode;
+};
+
 struct landlockd_policy_ir_mount_rule {
   char *path;
 };
@@ -68,7 +74,7 @@ struct landlockd_policy_ir {
   size_t broker_mount_object_count;
   struct landlockd_policy_ir_mount_object_rule *broker_mount_object_rules;
   size_t broker_addfd_count;
-  struct landlockd_policy_ir_broker_open_rule *broker_addfd_rules;
+  struct landlockd_policy_ir_broker_addfd_rule *broker_addfd_rules;
   size_t mount_tmpfs_count;
   struct landlockd_policy_ir_mount_rule *mount_tmpfs_rules;
   size_t mount_bind_count;
@@ -115,7 +121,8 @@ int landlockd_policy_ir_add_broker_mount_object_rule(
     const char *const *attach_paths, size_t attach_count,
     uint64_t allowed_attr_set);
 int landlockd_policy_ir_add_broker_addfd_rule(
-    struct landlockd_policy_ir *ir, const char *path);
+    struct landlockd_policy_ir *ir, const char *action, const char *target,
+    const char *mode);
 int landlockd_policy_ir_add_mount_tmpfs_rule(struct landlockd_policy_ir *ir,
                                              const char *path);
 int landlockd_policy_ir_add_mount_bind_rule(struct landlockd_policy_ir *ir,

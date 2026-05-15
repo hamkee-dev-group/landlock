@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::process;
 
 const LANDLOCKD_POLICY_WIRE_MAGIC: u32 = 0x4c50_4c44;
-const LANDLOCKD_POLICY_WIRE_VERSION: u32 = 14;
+const LANDLOCKD_POLICY_WIRE_VERSION: u32 = 15;
 const DEFAULT_SECCOMP_ERRNO: u16 = 1;
 
 const ACCESS_EXECUTE: u64 = 1u64 << 0;
@@ -44,7 +44,7 @@ struct PolicyIr {
     broker_mount_tmpfs: Vec<String>,
     broker_mount_bind: Vec<BindMountIr>,
     broker_mount_object: Vec<MountObjectIr>,
-    broker_addfd: Vec<String>,
+    broker_addfd: Vec<AddfdRuleIr>,
     mount_tmpfs: Vec<String>,
     mount_bind: Vec<BindMountIr>,
     mount_proc: Vec<String>,
@@ -81,6 +81,12 @@ struct MountObjectIr {
     fs_type: String,
     attach: Vec<String>,
     attrs: u64,
+}
+
+struct AddfdRuleIr {
+    action: String,
+    target: String,
+    mode: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -136,7 +142,15 @@ struct BrokerDoc {
     mount_tmpfs: Option<Vec<String>>,
     mount_bind: Option<Vec<BindMountDoc>>,
     mount_object: Option<Vec<MountObjectDoc>>,
-    addfd: Option<Vec<String>>,
+    addfd: Option<Vec<AddfdDoc>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AddfdDoc {
+    action: String,
+    target: String,
+    mode: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -251,6 +265,32 @@ fn parse_bind_list(items: Option<Vec<BindMountDoc>>, field: &str) -> Result<Vec<
             source: item.source,
             target: item.target,
             read_only: item.read_only.unwrap_or(true),
+        });
+    }
+    Ok(out)
+}
+
+fn parse_addfd_list(
+    items: Option<Vec<AddfdDoc>>,
+    field: &str,
+) -> Result<Vec<AddfdRuleIr>, String> {
+    let Some(items) = items else {
+        return Ok(Vec::new());
+    };
+    if items.is_empty() {
+        return Err(format!("{}: must contain at least one entry", field));
+    }
+    let mut out = Vec::with_capacity(items.len());
+    for (index, item) in items.into_iter().enumerate() {
+        require_non_empty(&format!("{}[{}].action", field, index), &item.action)?;
+        require_absolute(&format!("{}[{}].target", field, index), &item.target)?;
+        if let Some(mode) = item.mode.as_deref() {
+            require_non_empty(&format!("{}[{}].mode", field, index), mode)?;
+        }
+        out.push(AddfdRuleIr {
+            action: item.action,
+            target: item.target,
+            mode: item.mode,
         });
     }
     Ok(out)
@@ -438,7 +478,7 @@ fn build_ir(doc: PolicyDoc) -> Result<PolicyIr, String> {
         ir.broker_mount_bind = parse_bind_list(broker.mount_bind, "broker.mount_bind")?;
         ir.broker_mount_object =
             parse_mount_object_list(broker.mount_object, "broker.mount_object")?;
-        ir.broker_addfd = parse_path_list(broker.addfd, "broker.addfd", true)?;
+        ir.broker_addfd = parse_addfd_list(broker.addfd, "broker.addfd")?;
     }
 
     if let Some(mount) = doc.mount {
@@ -589,8 +629,13 @@ fn write_ir<W: Write>(writer: &mut W, ir: &PolicyIr) -> io::Result<()> {
             write_len_prefixed_string(writer, path)?;
         }
     }
-    for path in &ir.broker_addfd {
-        write_len_prefixed_string(writer, path)?;
+    for entry in &ir.broker_addfd {
+        write_len_prefixed_string(writer, &entry.action)?;
+        write_len_prefixed_string(writer, &entry.target)?;
+        match &entry.mode {
+            Some(mode) => write_len_prefixed_string(writer, mode)?,
+            None => write_u32(writer, 0)?,
+        }
     }
     for path in &ir.mount_tmpfs {
         write_len_prefixed_string(writer, path)?;

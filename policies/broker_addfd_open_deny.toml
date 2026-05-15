@@ -1,0 +1,11 @@
+version = 1
+
+[[fs_layer]]
+handled_access_fs = ["execute", "read_file"]
+
+  [[fs_layer.rule]]
+  path = "/tmp/landlockd-addfd-helper"
+  allowed_access = ["execute", "read_file"]
+
+[broker]
+allow_read = ["/tmp/landlockd-addfd-allow"]

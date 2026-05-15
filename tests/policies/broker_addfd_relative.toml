@@ -1,4 +1,7 @@
 version = 1
 
 [broker]
-addfd = ["relative/path"]
+  [[broker.addfd]]
+  action = "open"
+  target = "relative/path"
+  mode = "read"

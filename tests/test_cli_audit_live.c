@@ -209,19 +209,34 @@ static int write_policy(const char *policy_path, const char *helper_dir,
         }
         if (allow_read &&
             (fprintf(fp, "allow_read = [\"%s\"]\n", read_target) < 0 ||
-             fprintf(fp, "addfd = [\"%s\"]\n", read_target) < 0)) {
+             fprintf(fp,
+                     "  [[broker.addfd]]\n"
+                     "  action = \"open\"\n"
+                     "  target = \"%s\"\n"
+                     "  mode = \"read\"\n",
+                     read_target) < 0)) {
             fclose(fp);
             return -1;
         }
         if (allow_write &&
             (fprintf(fp, "allow_write = [\"%s\"]\n", write_target) < 0 ||
-             fprintf(fp, "addfd = [\"%s\"]\n", write_target) < 0)) {
+             fprintf(fp,
+                     "  [[broker.addfd]]\n"
+                     "  action = \"open\"\n"
+                     "  target = \"%s\"\n"
+                     "  mode = \"write\"\n",
+                     write_target) < 0)) {
             fclose(fp);
             return -1;
         }
         if (allow_scratch &&
             (fprintf(fp, "scratch = [\"%s\"]\n", scratch_root) < 0 ||
-             fprintf(fp, "addfd = [\"%s\"]\n", scratch_root) < 0)) {
+             fprintf(fp,
+                     "  [[broker.addfd]]\n"
+                     "  action = \"scratch_open\"\n"
+                     "  target = \"%s\"\n"
+                     "  mode = \"write\"\n",
+                     scratch_root) < 0)) {
             fclose(fp);
             return -1;
         }

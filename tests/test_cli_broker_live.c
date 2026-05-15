@@ -166,13 +166,23 @@ static int write_policy(const char *policy_path, const char *helper_dir,
         }
         if (allow_read &&
             (fprintf(fp, "allow_read = [\"%s\"]\n", read_target) < 0 ||
-             fprintf(fp, "addfd = [\"%s\"]\n", read_target) < 0)) {
+             fprintf(fp,
+                     "  [[broker.addfd]]\n"
+                     "  action = \"open\"\n"
+                     "  target = \"%s\"\n"
+                     "  mode = \"read\"\n",
+                     read_target) < 0)) {
             fclose(fp);
             return -1;
         }
         if (allow_write &&
             (fprintf(fp, "allow_write = [\"%s\"]\n", write_target) < 0 ||
-             fprintf(fp, "addfd = [\"%s\"]\n", write_target) < 0)) {
+             fprintf(fp,
+                     "  [[broker.addfd]]\n"
+                     "  action = \"open\"\n"
+                     "  target = \"%s\"\n"
+                     "  mode = \"write\"\n",
+                     write_target) < 0)) {
             fclose(fp);
             return -1;
         }
@@ -402,7 +412,10 @@ int main(int argc, char *argv[])
         if (fp == NULL ||
             fprintf(fp, "\n[broker]\n"
                         "scratch = [\"%s\"]\n"
-                        "addfd = [\"%s\"]\n",
+                        "  [[broker.addfd]]\n"
+                        "  action = \"scratch_open\"\n"
+                        "  target = \"%s\"\n"
+                        "  mode = \"write\"\n",
                         scratch_root, scratch_root) < 0) {
             diag("writing scratch policy failed: %s", strerror(errno));
             if (fp != NULL) {
@@ -418,7 +431,10 @@ int main(int argc, char *argv[])
             fprintf(fp, "\n[broker]\n"
                         "scratch = [\"%s\"]\n"
                         "export = [\"%s\"]\n"
-                        "addfd = [\"%s\"]\n",
+                        "  [[broker.addfd]]\n"
+                        "  action = \"scratch_open\"\n"
+                        "  target = \"%s\"\n"
+                        "  mode = \"write\"\n",
                         scratch_root, export_root, scratch_root) < 0) {
             diag("writing export policy failed: %s", strerror(errno));
             if (fp != NULL) {
@@ -429,7 +445,7 @@ int main(int argc, char *argv[])
         fclose(fp);
     }
 
-    plan(28);
+    plan(31);
 
     direct_ok_argv[0] = argv[1];
     direct_ok_argv[1] = "run";
@@ -442,6 +458,10 @@ int main(int argc, char *argv[])
     ok(run_landlockd(argv[1], direct_ok_argv, &direct_status) == 0 &&
            WIFEXITED(direct_status) && WEXITSTATUS(direct_status) == 0,
        "direct run uses the broker to satisfy a denied host-file open");
+
+    ok(run_landlockd(argv[1], direct_ok_argv, &direct_status) == 0 &&
+           WIFEXITED(direct_status) && WEXITSTATUS(direct_status) == 0,
+       "direct run uses broker.addfd open rule for declared read target");
 
     direct_fail_argv[0] = argv[1];
     direct_fail_argv[1] = "run";
@@ -530,6 +550,26 @@ int main(int argc, char *argv[])
            WIFEXITED(direct_status) && WEXITSTATUS(direct_status) == 0 &&
            file_contains_exactly(scratch_file, "scratch") == 0,
        "direct run brokers O_CREAT under the scratch root");
+
+    if (unlink(scratch_file) < 0 && errno != ENOENT) {
+        diag("scratch cleanup before scratch_open re-test failed: %s",
+             strerror(errno));
+        return 1;
+    }
+    ok(run_landlockd(argv[1], direct_scratch_create_argv, &direct_status) == 0 &&
+           WIFEXITED(direct_status) && WEXITSTATUS(direct_status) == 0 &&
+           file_contains_exactly(scratch_file, "scratch") == 0,
+       "scratch O_CREAT requires broker.addfd scratch_open and the declared rule satisfies it");
+
+    if (unlink(scratch_file) < 0 && errno != ENOENT) {
+        diag("scratch cleanup before scratch_open follow-up failed: %s",
+             strerror(errno));
+        return 1;
+    }
+    ok(run_landlockd(argv[1], direct_scratch_create_argv, &direct_status) == 0 &&
+           WIFEXITED(direct_status) && WEXITSTATUS(direct_status) == 0 &&
+           file_contains_exactly(scratch_file, "scratch") == 0,
+       "brokered scratch O_CREAT honors broker.addfd scratch_open declaration");
 
     direct_scratch_rename_argv[0] = argv[1];
     direct_scratch_rename_argv[1] = "run";

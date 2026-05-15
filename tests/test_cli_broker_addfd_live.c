@@ -164,7 +164,12 @@ static int write_read_policy(const char *policy_path, const char *helper_dir,
         return -1;
     }
     if (with_addfd &&
-        fprintf(fp, "addfd = [\"%s\"]\n", read_target) < 0) {
+        fprintf(fp,
+                "[[broker.addfd]]\n"
+                "action = \"open\"\n"
+                "target = \"%s\"\n"
+                "mode = \"read\"\n",
+                read_target) < 0) {
         fclose(fp);
         return -1;
     }
@@ -186,7 +191,36 @@ static int write_write_policy(const char *policy_path, const char *helper_dir,
         return -1;
     }
     if (with_addfd &&
-        fprintf(fp, "addfd = [\"%s\"]\n", write_target) < 0) {
+        fprintf(fp,
+                "[[broker.addfd]]\n"
+                "action = \"open\"\n"
+                "target = \"%s\"\n"
+                "mode = \"write\"\n",
+                write_target) < 0) {
+        fclose(fp);
+        return -1;
+    }
+    return fclose(fp) < 0 ? -1 : 0;
+}
+
+static int write_rw_read_only_addfd_policy(const char *policy_path,
+                                           const char *helper_dir,
+                                           const char *rw_target)
+{
+    FILE *fp;
+
+    fp = fopen(policy_path, "w");
+    if (fp == NULL) {
+        return -1;
+    }
+    if (write_base_policy(fp, helper_dir) < 0 ||
+        fprintf(fp,
+                "\n[broker]\nallow_read = [\"%s\"]\nallow_write = [\"%s\"]\n"
+                "[[broker.addfd]]\n"
+                "action = \"open\"\n"
+                "target = \"%s\"\n"
+                "mode = \"read\"\n",
+                rw_target, rw_target, rw_target) < 0) {
         fclose(fp);
         return -1;
     }
@@ -208,7 +242,12 @@ static int write_scratch_policy(const char *policy_path, const char *helper_dir,
         return -1;
     }
     if (with_addfd &&
-        fprintf(fp, "addfd = [\"%s\"]\n", scratch_root) < 0) {
+        fprintf(fp,
+                "[[broker.addfd]]\n"
+                "action = \"scratch_open\"\n"
+                "target = \"%s\"\n"
+                "mode = \"write\"\n",
+                scratch_root) < 0) {
         fclose(fp);
         return -1;
     }
@@ -252,12 +291,15 @@ int main(int argc, char *argv[])
     char policy_write_with_addfd[PATH_MAX];
     char policy_scratch_no_addfd[PATH_MAX];
     char policy_scratch_with_addfd[PATH_MAX];
+    char policy_rw_read_only_addfd[PATH_MAX];
+    char rw_target[PATH_MAX];
     char *read_fail_argv[8];
     char *read_ok_argv[8];
     char *write_fail_argv[9];
     char *write_ok_argv[9];
     char *scratch_fail_argv[9];
     char *scratch_ok_argv[9];
+    char *mode_mismatch_argv[9];
     int status;
 
     if (argc < 3) {
@@ -298,6 +340,9 @@ int main(int argc, char *argv[])
              "%s/scratch-no-addfd.toml", tempdir);
     snprintf(policy_scratch_with_addfd, sizeof(policy_scratch_with_addfd),
              "%s/scratch-with-addfd.toml", tempdir);
+    snprintf(rw_target, sizeof(rw_target), "%s/brokered-rw.txt", tempdir);
+    snprintf(policy_rw_read_only_addfd, sizeof(policy_rw_read_only_addfd),
+             "%s/rw-read-only-addfd.toml", tempdir);
 
     {
         FILE *fp = fopen(read_target, "w");
@@ -312,6 +357,15 @@ int main(int argc, char *argv[])
         FILE *fp = fopen(write_target, "w");
         if (fp == NULL) {
             diag("fopen write target failed: %s", strerror(errno));
+            return 1;
+        }
+        fputs("seed", fp);
+        fclose(fp);
+    }
+    {
+        FILE *fp = fopen(rw_target, "w");
+        if (fp == NULL) {
+            diag("fopen rw target failed: %s", strerror(errno));
             return 1;
         }
         fputs("seed", fp);
@@ -333,12 +387,14 @@ int main(int argc, char *argv[])
         write_scratch_policy(policy_scratch_no_addfd, helper_dir, scratch_root,
                              0) < 0 ||
         write_scratch_policy(policy_scratch_with_addfd, helper_dir,
-                             scratch_root, 1) < 0) {
+                             scratch_root, 1) < 0 ||
+        write_rw_read_only_addfd_policy(policy_rw_read_only_addfd, helper_dir,
+                                        rw_target) < 0) {
         diag("writing policy failed: %s", strerror(errno));
         return 1;
     }
 
-    plan(6);
+    plan(7);
 
     read_fail_argv[0] = argv[1];
     read_fail_argv[1] = "run";
@@ -419,6 +475,20 @@ int main(int argc, char *argv[])
            WIFEXITED(status) && WEXITSTATUS(status) == 0 &&
            file_contains_exactly(scratch_file, "scratch") == 0,
        "matching broker.addfd rule restores brokered scratch creation");
+
+    mode_mismatch_argv[0] = argv[1];
+    mode_mismatch_argv[1] = "run";
+    mode_mismatch_argv[2] = "--policy-file";
+    mode_mismatch_argv[3] = policy_rw_read_only_addfd;
+    mode_mismatch_argv[4] = "--";
+    mode_mismatch_argv[5] = argv[2];
+    mode_mismatch_argv[6] = rw_target;
+    mode_mismatch_argv[7] = "append";
+    mode_mismatch_argv[8] = NULL;
+    ok(run_landlockd(argv[1], mode_mismatch_argv, &status) == 0 &&
+           WIFEXITED(status) && WEXITSTATUS(status) != 0 &&
+           file_contains_exactly(rw_target, "seed") == 0,
+       "broker.addfd mode=\"read\" rule does not authorize a write fd injection even when allow_write covers the path");
 
     done_testing();
 }

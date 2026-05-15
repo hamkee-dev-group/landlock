@@ -192,8 +192,11 @@ int main(int argc, char *argv[]) {
   rc = load_capturing(broker_path, &ir, err, sizeof(err));
   ok(rc == 0, "broker addfd policy loads successfully");
   ok(ir.broker_addfd_count == 1 &&
-         strcmp(ir.broker_addfd_rules[0].path, "/tmp/landlockd-addfd") == 0,
-     "broker.addfd populates the addfd path list");
+         strcmp(ir.broker_addfd_rules[0].action, "open") == 0 &&
+         strcmp(ir.broker_addfd_rules[0].target, "/tmp/landlockd-addfd") == 0 &&
+         ir.broker_addfd_rules[0].mode != NULL &&
+         strcmp(ir.broker_addfd_rules[0].mode, "read") == 0,
+     "broker.addfd populates the addfd rule list");
   landlockd_policy_ir_reset(&ir);
   free(broker_path);
 

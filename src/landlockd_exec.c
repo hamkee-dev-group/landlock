@@ -52,7 +52,7 @@ struct landlockd_broker_allowlist {
   size_t mount_bind_count;
   struct landlockd_policy_ir_mount_object_rule *mount_object_rules;
   size_t mount_object_count;
-  char **addfd_paths;
+  struct landlockd_policy_ir_broker_addfd_rule *addfd_rules;
   size_t addfd_count;
 };
 
@@ -556,11 +556,13 @@ static void landlockd_broker_allowlist_cleanup(
     }
     free(allowlist->mount_object_rules);
   }
-  if (allowlist->addfd_paths != NULL) {
+  if (allowlist->addfd_rules != NULL) {
     for (i = 0; i < allowlist->addfd_count; i++) {
-      free(allowlist->addfd_paths[i]);
+      free(allowlist->addfd_rules[i].action);
+      free(allowlist->addfd_rules[i].target);
+      free(allowlist->addfd_rules[i].mode);
     }
-    free(allowlist->addfd_paths);
+    free(allowlist->addfd_rules);
   }
   allowlist->read_paths = NULL;
   allowlist->read_count = 0;
@@ -576,7 +578,7 @@ static void landlockd_broker_allowlist_cleanup(
   allowlist->mount_bind_count = 0;
   allowlist->mount_object_rules = NULL;
   allowlist->mount_object_count = 0;
-  allowlist->addfd_paths = NULL;
+  allowlist->addfd_rules = NULL;
   allowlist->addfd_count = 0;
 }
 
@@ -893,6 +895,107 @@ fail:
   return -1;
 }
 
+static int landlockd_broker_canonicalize_addfd_rules(
+    const struct landlockd_policy_ir_broker_addfd_rule *rules, size_t rule_count,
+    struct landlockd_policy_ir_broker_addfd_rule **rules_out,
+    size_t *count_out) {
+  struct landlockd_policy_ir_broker_addfd_rule *resolved_rules;
+  size_t i;
+
+  *rules_out = NULL;
+  *count_out = 0;
+  if (rule_count == 0) {
+    return 0;
+  }
+
+  resolved_rules = calloc(rule_count, sizeof(*resolved_rules));
+  if (resolved_rules == NULL) {
+    return -1;
+  }
+
+  for (i = 0; i < rule_count; i++) {
+    resolved_rules[i].action = strdup(rules[i].action);
+    if (resolved_rules[i].action == NULL) {
+      goto fail;
+    }
+    resolved_rules[i].target = realpath(rules[i].target, NULL);
+    if (resolved_rules[i].target == NULL) {
+      goto fail;
+    }
+    if (rules[i].mode != NULL) {
+      resolved_rules[i].mode = strdup(rules[i].mode);
+      if (resolved_rules[i].mode == NULL) {
+        goto fail;
+      }
+    }
+  }
+
+  *rules_out = resolved_rules;
+  *count_out = rule_count;
+  return 0;
+
+fail:
+  for (i = 0; i < rule_count; i++) {
+    free(resolved_rules[i].action);
+    free(resolved_rules[i].target);
+    free(resolved_rules[i].mode);
+  }
+  free(resolved_rules);
+  return -1;
+}
+
+static int landlockd_broker_addfd_allowed(
+    const struct landlockd_broker_allowlist *allowlist, const char *action,
+    const char *target, const char *mode) {
+  size_t i;
+  size_t root_len;
+  const struct landlockd_policy_ir_broker_addfd_rule *rule;
+
+  if (allowlist == NULL || action == NULL || target == NULL) {
+    return 0;
+  }
+  for (i = 0; i < allowlist->addfd_count; i++) {
+    rule = &allowlist->addfd_rules[i];
+    if (strcmp(rule->action, action) != 0) {
+      continue;
+    }
+    if (mode != NULL && rule->mode != NULL &&
+        strcmp(rule->mode, mode) != 0) {
+      continue;
+    }
+    root_len = strlen(rule->target);
+    if (strncmp(rule->target, target, root_len) == 0 &&
+        (target[root_len] == '\0' || target[root_len] == '/')) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static int landlockd_broker_mount_object_addfd_covers_action(
+    const struct landlockd_broker_allowlist *allowlist, const char *action,
+    const struct landlockd_policy_ir_mount_object_rule *rule) {
+  size_t i;
+
+  if (rule->attach_count == 0) {
+    return 0;
+  }
+  for (i = 0; i < rule->attach_count; i++) {
+    if (!landlockd_broker_addfd_allowed(allowlist, action,
+                                        rule->attach_paths[i], NULL)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static const char *landlockd_broker_addfd_mode_name(int access_mode) {
+  if (access_mode == O_RDONLY) {
+    return "read";
+  }
+  return "write";
+}
+
 static int landlockd_broker_allowlist_init(
     const struct landlockd_policy_ir *ir,
     struct landlockd_broker_allowlist *allowlist) {
@@ -910,7 +1013,7 @@ static int landlockd_broker_allowlist_init(
   allowlist->mount_bind_count = 0;
   allowlist->mount_object_rules = NULL;
   allowlist->mount_object_count = 0;
-  allowlist->addfd_paths = NULL;
+  allowlist->addfd_rules = NULL;
   allowlist->addfd_count = 0;
 
   if (landlockd_broker_canonicalize_rules(
@@ -955,9 +1058,9 @@ static int landlockd_broker_allowlist_init(
     landlockd_broker_allowlist_cleanup(allowlist);
     return -1;
   }
-  if (landlockd_broker_canonicalize_rules(
+  if (landlockd_broker_canonicalize_addfd_rules(
           ir->broker_addfd_rules, ir->broker_addfd_count,
-          &allowlist->addfd_paths, &allowlist->addfd_count) < 0) {
+          &allowlist->addfd_rules, &allowlist->addfd_count) < 0) {
     landlockd_broker_allowlist_cleanup(allowlist);
     return -1;
   }
@@ -2127,23 +2230,6 @@ static int landlockd_broker_path_under_list(char *const *paths, size_t count,
   return 0;
 }
 
-static int landlockd_broker_mount_object_addfd_covers(
-    char *const *addfd_paths, size_t addfd_count,
-    const struct landlockd_policy_ir_mount_object_rule *rule) {
-  size_t i;
-
-  if (rule->attach_count == 0) {
-    return 0;
-  }
-  for (i = 0; i < rule->attach_count; i++) {
-    if (!landlockd_broker_path_under_list(addfd_paths, addfd_count,
-                                          rule->attach_paths[i])) {
-      return 0;
-    }
-  }
-  return 1;
-}
-
 static int landlockd_broker_is_allowed(
     const struct landlockd_broker_allowlist *allowlist,
     const char *canonical_path, int access_mode) {
@@ -2788,9 +2874,8 @@ static int landlockd_broker_handle_fsopen_request(
                                  "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
-  if (!landlockd_broker_mount_object_addfd_covers(allowlist->addfd_paths,
-                                                  allowlist->addfd_count,
-                                                  rule)) {
+  if (!landlockd_broker_mount_object_addfd_covers_action(allowlist, "fsopen",
+                                                         rule)) {
     landlockd_audit_broker_mount(diag, "broker.fsopen", req, object_name,
                                  "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
@@ -2915,9 +3000,8 @@ static int landlockd_broker_handle_fsmount_request(
                                  EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
-  if (!landlockd_broker_mount_object_addfd_covers(allowlist->addfd_paths,
-                                                  allowlist->addfd_count,
-                                                  rule)) {
+  if (!landlockd_broker_mount_object_addfd_covers_action(allowlist, "fsmount",
+                                                         rule)) {
     free(object_name);
     landlockd_audit_broker_mount(diag, "broker.fsmount", req, rule->name,
                                  "deny", EACCES);
@@ -3090,9 +3174,8 @@ static int landlockd_broker_handle_open_tree_request(
                                  canonical_source, "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
-  if (!landlockd_broker_path_under_list(allowlist->addfd_paths,
-                                        allowlist->addfd_count,
-                                        canonical_source)) {
+  if (!landlockd_broker_addfd_allowed(allowlist, "open_tree",
+                                      canonical_source, NULL)) {
     landlockd_audit_broker_mount(diag, "broker.open_tree", req,
                                  canonical_source, "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
@@ -3549,9 +3632,9 @@ static int landlockd_broker_handle_scratch_open(
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
 
-  if (!landlockd_broker_path_under_list(allowlist->addfd_paths,
-                                        allowlist->addfd_count,
-                                        canonical_path)) {
+  if (!landlockd_broker_addfd_allowed(
+          allowlist, "scratch_open", canonical_path,
+          landlockd_broker_addfd_mode_name(access_mode))) {
     landlockd_audit_broker_open(diag, req, canonical_path, "scratch",
                                 operation_name, "deny", EACCES);
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
@@ -4113,9 +4196,9 @@ static int landlockd_broker_handle_open_request(
     return landlockd_broker_send_errno(listener_fd, req->id, EACCES);
   }
 
-  if (!landlockd_broker_path_under_list(allowlist->addfd_paths,
-                                        allowlist->addfd_count,
-                                        canonical_path)) {
+  if (!landlockd_broker_addfd_allowed(
+          allowlist, "open", canonical_path,
+          landlockd_broker_addfd_mode_name(access_mode))) {
     landlockd_audit_broker_open(diag, req, canonical_path, "exception",
                                 landlockd_open_access_name(access_mode), "deny",
                                 EACCES);

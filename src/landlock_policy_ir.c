@@ -65,7 +65,9 @@ void landlockd_policy_ir_reset(struct landlockd_policy_ir *ir) {
   }
   free(ir->broker_mount_object_rules);
   for (i = 0; i < ir->broker_addfd_count; i++) {
-    free(ir->broker_addfd_rules[i].path);
+    free(ir->broker_addfd_rules[i].action);
+    free(ir->broker_addfd_rules[i].target);
+    free(ir->broker_addfd_rules[i].mode);
   }
   free(ir->broker_addfd_rules);
   for (i = 0; i < ir->mount_tmpfs_count; i++) {
@@ -420,29 +422,51 @@ fail:
 }
 
 int landlockd_policy_ir_add_broker_addfd_rule(
-    struct landlockd_policy_ir *ir, const char *path) {
-  struct landlockd_policy_ir_broker_open_rule *grown;
-  char *path_copy;
+    struct landlockd_policy_ir *ir, const char *action, const char *target,
+    const char *mode) {
+  struct landlockd_policy_ir_broker_addfd_rule *grown;
+  char *action_copy;
+  char *target_copy;
+  char *mode_copy;
 
-  if (ir == NULL || path == NULL || path[0] == '\0') {
+  if (ir == NULL || action == NULL || action[0] == '\0' || target == NULL ||
+      target[0] == '\0') {
     errno = EINVAL;
     return -1;
   }
 
-  path_copy = strdup(path);
-  if (path_copy == NULL) {
+  action_copy = strdup(action);
+  if (action_copy == NULL) {
     return -1;
+  }
+  target_copy = strdup(target);
+  if (target_copy == NULL) {
+    free(action_copy);
+    return -1;
+  }
+  mode_copy = NULL;
+  if (mode != NULL && mode[0] != '\0') {
+    mode_copy = strdup(mode);
+    if (mode_copy == NULL) {
+      free(action_copy);
+      free(target_copy);
+      return -1;
+    }
   }
 
   grown = realloc(ir->broker_addfd_rules,
                   (ir->broker_addfd_count + 1) * sizeof(*grown));
   if (grown == NULL) {
-    free(path_copy);
+    free(action_copy);
+    free(target_copy);
+    free(mode_copy);
     return -1;
   }
 
   ir->broker_addfd_rules = grown;
-  grown[ir->broker_addfd_count].path = path_copy;
+  grown[ir->broker_addfd_count].action = action_copy;
+  grown[ir->broker_addfd_count].target = target_copy;
+  grown[ir->broker_addfd_count].mode = mode_copy;
   ir->broker_addfd_count++;
   return 0;
 }
@@ -845,10 +869,22 @@ int landlockd_policy_ir_copy(const struct landlockd_policy_ir *src,
     }
     dst->broker_addfd_count = src->broker_addfd_count;
     for (i = 0; i < src->broker_addfd_count; i++) {
-      dst->broker_addfd_rules[i].path =
-          strdup(src->broker_addfd_rules[i].path);
-      if (dst->broker_addfd_rules[i].path == NULL) {
+      dst->broker_addfd_rules[i].action =
+          strdup(src->broker_addfd_rules[i].action);
+      if (dst->broker_addfd_rules[i].action == NULL) {
         goto fail;
+      }
+      dst->broker_addfd_rules[i].target =
+          strdup(src->broker_addfd_rules[i].target);
+      if (dst->broker_addfd_rules[i].target == NULL) {
+        goto fail;
+      }
+      if (src->broker_addfd_rules[i].mode != NULL) {
+        dst->broker_addfd_rules[i].mode =
+            strdup(src->broker_addfd_rules[i].mode);
+        if (dst->broker_addfd_rules[i].mode == NULL) {
+          goto fail;
+        }
       }
     }
   }

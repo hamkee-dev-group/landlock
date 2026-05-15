@@ -113,7 +113,14 @@ static int write_policy(const char *policy_path, const char *helper_dir,
     return -1;
   }
   if (with_object && with_addfd &&
-      fprintf(fp, "addfd = [\"%s\"]\n", target_dir) < 0) {
+      fprintf(fp,
+              "  [[broker.addfd]]\n"
+              "  action = \"fsopen\"\n"
+              "  target = \"%s\"\n"
+              "  [[broker.addfd]]\n"
+              "  action = \"fsmount\"\n"
+              "  target = \"%s\"\n",
+              target_dir, target_dir) < 0) {
     fclose(fp);
     return -1;
   }

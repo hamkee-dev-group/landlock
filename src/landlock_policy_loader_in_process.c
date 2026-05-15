@@ -345,6 +345,105 @@ static int load_net(const toml_table_t *net_tbl,
   return 0;
 }
 
+static int load_broker_addfd_array(toml_array_t *addfd_arr,
+                                   struct landlockd_policy_ir *ir,
+                                   const char *file_path, FILE *err) {
+  static const char *const allowed[] = {"action", "target", "mode"};
+  const char *offending;
+  toml_table_t *entry;
+  toml_datum_t action_d;
+  toml_datum_t target_d;
+  toml_datum_t mode_d;
+  int n;
+  int i;
+
+  if (addfd_arr == NULL) {
+    return 0;
+  }
+
+  n = toml_array_nelem(addfd_arr);
+  if (n <= 0) {
+    report(err, file_path, "broker.addfd: must contain at least one entry");
+    return -1;
+  }
+
+  for (i = 0; i < n; i++) {
+    entry = toml_table_at(addfd_arr, i);
+    if (entry == NULL) {
+      report(err, file_path,
+             "broker.addfd[%d]: expected a table with action/target/mode keys",
+             i);
+      return -1;
+    }
+    if (table_has_only_keys(entry, allowed,
+                            sizeof(allowed) / sizeof(allowed[0]),
+                            &offending) < 0) {
+      report(err, file_path, "broker.addfd[%d]: unknown key \"%s\"", i,
+             offending);
+      return -1;
+    }
+
+    action_d = toml_string_in(entry, "action");
+    if (!action_d.ok || action_d.u.s[0] == '\0') {
+      if (action_d.ok) {
+        free(action_d.u.s);
+      }
+      report(err, file_path,
+             "broker.addfd[%d].action: expected a non-empty string", i);
+      return -1;
+    }
+
+    target_d = toml_string_in(entry, "target");
+    if (!target_d.ok || target_d.u.s[0] == '\0') {
+      free(action_d.u.s);
+      if (target_d.ok) {
+        free(target_d.u.s);
+      }
+      report(err, file_path,
+             "broker.addfd[%d].target: expected a non-empty string", i);
+      return -1;
+    }
+    if (target_d.u.s[0] != '/') {
+      free(action_d.u.s);
+      report(err, file_path,
+             "broker.addfd[%d].target: expected an absolute path", i);
+      free(target_d.u.s);
+      return -1;
+    }
+
+    mode_d = toml_string_in(entry, "mode");
+    if (toml_key_exists(entry, "mode") && (!mode_d.ok || mode_d.u.s[0] == '\0')) {
+      free(action_d.u.s);
+      free(target_d.u.s);
+      if (mode_d.ok) {
+        free(mode_d.u.s);
+      }
+      report(err, file_path,
+             "broker.addfd[%d].mode: expected a non-empty string", i);
+      return -1;
+    }
+
+    if (landlockd_policy_ir_add_broker_addfd_rule(
+            ir, action_d.u.s, target_d.u.s, mode_d.ok ? mode_d.u.s : NULL) <
+        0) {
+      report(err, file_path, "broker.addfd[%d]: internal error: %s", i,
+             strerror(errno));
+      free(action_d.u.s);
+      free(target_d.u.s);
+      if (mode_d.ok) {
+        free(mode_d.u.s);
+      }
+      return -1;
+    }
+    free(action_d.u.s);
+    free(target_d.u.s);
+    if (mode_d.ok) {
+      free(mode_d.u.s);
+    }
+  }
+  return 0;
+}
+
 static int load_broker_path_array(
     toml_array_t *paths_arr, struct landlockd_policy_ir *ir,
     const char *field_name, const char *file_path, FILE *err,
@@ -702,8 +801,7 @@ static int load_broker(const toml_table_t *broker_tbl,
   }
 
   addfd_arr = toml_array_in(broker_tbl, "addfd");
-  if (load_broker_path_array(addfd_arr, ir, "addfd", file_path, err, 1,
-                             landlockd_policy_ir_add_broker_addfd_rule) < 0) {
+  if (load_broker_addfd_array(addfd_arr, ir, file_path, err) < 0) {
     return -1;
   }
 

@@ -1,4 +1,7 @@
 version = 1
 
 [broker]
-addfd = ["/tmp/landlockd-addfd"]
+  [[broker.addfd]]
+  action = "open"
+  target = "/tmp/landlockd-addfd"
+  mode = "read"

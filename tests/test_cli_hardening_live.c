@@ -126,7 +126,12 @@ static int write_policy(const char *policy_path, const char *helper_dir,
         maybe_emit_rule(fp, "/usr/lib64",
                         "[\"execute\", \"read_file\", \"read_dir\"]") < 0 ||
         maybe_emit_rule(fp, "/etc", "[\"read_file\", \"read_dir\"]") < 0 ||
-        fprintf(fp, "\n[broker]\nallow_read = [\"%s\"]\naddfd = [\"%s\"]\n",
+        fprintf(fp,
+                "\n[broker]\nallow_read = [\"%s\"]\n"
+                "  [[broker.addfd]]\n"
+                "  action = \"open\"\n"
+                "  target = \"%s\"\n"
+                "  mode = \"read\"\n",
                 read_target, read_target) < 0) {
         fclose(fp);
         return -1;

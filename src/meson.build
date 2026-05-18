@@ -120,3 +120,19 @@ landlockd_exe = executable('landlockd',
   dependencies : tomlc99_dep,
   link_with : liblandlock,
   install : true)
+
+landlockd_run_exe = executable('landlockd-run',
+  landlockd_cli_sources + landlockd_runtime_sources + files('landlockd_run_main.c'),
+  include_directories : [inc, src_inc],
+  c_args : policy_loader_c_args,
+  dependencies : tomlc99_dep,
+  link_with : liblandlock,
+  install : true)
+
+landlockd_policy_exe = executable('landlockd-policy',
+  landlockd_cli_sources + landlockd_runtime_sources + files('landlockd_policy_main.c'),
+  include_directories : [inc, src_inc],
+  c_args : policy_loader_c_args,
+  dependencies : tomlc99_dep,
+  link_with : liblandlock,
+  install : true)

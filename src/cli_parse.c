@@ -18,13 +18,20 @@ static int cli_parse_syscall_nr(const char *s, int *out) {
   return 0;
 }
 
+static const char *cli_basename(const char *path) {
+  const char *slash;
+
+  if (path == NULL) {
+    return "";
+  }
+  slash = strrchr(path, '/');
+  return slash != NULL ? slash + 1 : path;
+}
+
 static int cli_parse_policy_verb(int argc, char *argv[],
                                  struct landlockd_cli_options *options,
-                                 enum landlockd_cli_verb verb) {
-  int argi;
-
+                                 enum landlockd_cli_verb verb, int argi) {
   options->verb = verb;
-  argi = 2;
   while (argi < argc && strcmp(argv[argi], "--") != 0) {
     if (strcmp(argv[argi], "--preflight") == 0) {
       options->preflight_only = 1;
@@ -135,13 +142,32 @@ int landlockd_cli_parse(int argc, char *argv[],
     return 0;
   }
 
+  if (argc >= 1) {
+    const char *base = cli_basename(argv[0]);
+    if (strcmp(base, "landlockd-run") == 0) {
+      return cli_parse_policy_verb(argc, argv, options,
+                                   LANDLOCKD_CLI_VERB_RUN, 1);
+    }
+    if (strcmp(base, "landlockd-policy") == 0 && argc >= 2) {
+      if (strcmp(argv[1], "lint") == 0) {
+        return cli_parse_policy_verb(argc, argv, options,
+                                     LANDLOCKD_CLI_VERB_LINT, 2);
+      }
+      if (strcmp(argv[1], "dry-run") == 0) {
+        options->dry_run = 1;
+        return cli_parse_policy_verb(argc, argv, options,
+                                     LANDLOCKD_CLI_VERB_RUN, 2);
+      }
+    }
+  }
+
   if (argc >= 2 && strcmp(argv[1], "run") == 0) {
     return cli_parse_policy_verb(argc, argv, options,
-                                 LANDLOCKD_CLI_VERB_RUN);
+                                 LANDLOCKD_CLI_VERB_RUN, 2);
   }
   if (argc >= 2 && strcmp(argv[1], "lint") == 0) {
     return cli_parse_policy_verb(argc, argv, options,
-                                 LANDLOCKD_CLI_VERB_LINT);
+                                 LANDLOCKD_CLI_VERB_LINT, 2);
   }
   if (argc == 4 && strcmp(argv[1], "serve") == 0 &&
       strcmp(argv[2], "--socket") == 0) {

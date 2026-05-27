@@ -149,9 +149,11 @@ int main(void) {
                          "--policy", "strict", "--", "/bin/true", NULL};
   char *invalid_argv[] = {"landlockd", "lint", "--policy", "bad/name", NULL};
   char *missing_argv[] = {"landlockd", "lint", "--policy", "missing", NULL};
+  char *split_run_argv[] = {"/usr/bin/landlockd-run", "--policy", "strict",
+                            "--", "/bin/true", NULL};
   int rc;
 
-  plan(12);
+  plan(13);
 
   if (mkdtemp(tempdir) == NULL) {
     diag("mkdtemp failed: %s", strerror(errno));
@@ -200,6 +202,13 @@ int main(void) {
          strcmp(run_policy_path, policy_path) == 0 &&
          strcmp(captured_argv0, "/bin/true") == 0,
      "direct runs receive the resolved policy file and command argv");
+
+  reset_captures();
+  rc = landlockd_cli_main(6, split_run_argv);
+  ok(rc == 0 && run_policy_call_count == 1 &&
+         strcmp(run_policy_path, policy_path) == 0 &&
+         strcmp(captured_argv0, "/bin/true") == 0,
+     "landlockd-run argv[0] wrapper dispatches to a direct policy run");
 
   reset_captures();
   rc = landlockd_cli_main(9, daemon_argv);

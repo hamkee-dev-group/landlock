@@ -241,13 +241,17 @@ int main(void)
                          "--dry-run", "--", "/bin/true", NULL};
     char *name_argv[] = {"landlockd", "run", "--policy", "strict",
                          "--dry-run", "--", "/bin/true", NULL};
+    char *split_policy_file_argv[] = {"landlockd-policy", "dry-run",
+                                      "--policy-file", policy_path, NULL};
+    char *split_policy_name_argv[] = {"landlockd-policy", "dry-run",
+                                      "--policy", "strict", NULL};
     char stdout_a[8192];
     char stdout_b[8192];
     char stderr_buf[512];
     int rc_a;
     int rc_b;
 
-    plan(8);
+    plan(10);
 
     if (mkdtemp(tempdir) == NULL ||
         snprintf(policy_path, sizeof(policy_path), "%s/strict.toml", tempdir) >=
@@ -298,6 +302,25 @@ int main(void)
        "dry-run exits 2 when the policy requires unsupported network ABI");
     ok(no_runtime_side_effects(),
        "dry-run does not fork, create rulesets, apply sandbox, or exec");
+
+    memset(&state, 0, sizeof(state));
+    state.preflight_abi = 5;
+    ok(capture_cli(4, split_policy_file_argv, &rc_a, stdout_b,
+                   sizeof(stdout_b), stderr_buf, sizeof(stderr_buf)) == 0 &&
+           rc_a == 0 &&
+           strstr(stdout_b, "landlockd dry-run v1\n") != NULL &&
+           strstr(stdout_b, "dry-run.status=ok\n") != NULL &&
+           no_runtime_side_effects(),
+       "landlockd-policy dry-run --policy-file produces dry-run output");
+
+    memset(&state, 0, sizeof(state));
+    state.preflight_abi = 5;
+    ok(capture_cli(4, split_policy_name_argv, &rc_a, stdout_b,
+                   sizeof(stdout_b), stderr_buf, sizeof(stderr_buf)) == 0 &&
+           rc_a == 0 && state.load_file_call_count == 1 &&
+           strstr(stdout_b, "landlockd dry-run v1\n") != NULL &&
+           no_runtime_side_effects(),
+       "landlockd-policy dry-run --policy NAME resolves and emits dry-run");
 
     done_testing();
 }

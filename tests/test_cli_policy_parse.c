@@ -27,10 +27,22 @@ int main(void)
     char *lint_no_policy_argv[] = {"landlockd", "lint", NULL};
     char *lint_with_cmd_argv[] = {"landlockd", "lint", "--policy", "strict",
                                   "--", "/bin/true", NULL};
+    char *split_run_argv[] = {"landlockd-run", "--policy", "strict", "--",
+                              "/bin/echo", "ok", NULL};
+    char *split_run_file_argv[] = {"/usr/local/bin/landlockd-run",
+                                   "--policy-file", "/etc/policy.yaml", "--",
+                                   "/bin/true", NULL};
+    char *split_policy_dry_run_argv[] = {"landlockd-policy", "dry-run",
+                                         "--policy-file", "/etc/policy.yaml",
+                                         NULL};
+    char *split_policy_dry_run_name_argv[] = {"landlockd-policy", "dry-run",
+                                              "--policy", "strict", NULL};
+    char *plain_dry_run_argv[] = {"landlockd", "dry-run", "--policy", "strict",
+                                  NULL};
     struct landlockd_cli_options options;
     int rc;
 
-    plan(12);
+    plan(17);
 
     errno = 0;
     rc = landlockd_cli_parse(2, help_argv, &options);
@@ -126,6 +138,52 @@ int main(void)
     rc = landlockd_cli_parse(6, lint_with_cmd_argv, &options);
     ok(rc == -1 && errno == EINVAL,
        "lint with a command after -- is rejected");
+    landlockd_cli_options_release(&options);
+
+    errno = 0;
+    rc = landlockd_cli_parse(6, split_run_argv, &options);
+    ok(rc == 0 && options.verb == LANDLOCKD_CLI_VERB_RUN &&
+           options.policy_name != NULL &&
+           strcmp(options.policy_name, "strict") == 0 &&
+           options.command_argv != NULL &&
+           strcmp(options.command_argv[0], "/bin/echo") == 0 &&
+           strcmp(options.command_argv[1], "ok") == 0 &&
+           options.command_argv[2] == NULL,
+       "landlockd-run argv[0] dispatches to run verb with named policy");
+    landlockd_cli_options_release(&options);
+
+    errno = 0;
+    rc = landlockd_cli_parse(5, split_run_file_argv, &options);
+    ok(rc == 0 && options.verb == LANDLOCKD_CLI_VERB_RUN &&
+           options.policy_file != NULL &&
+           strcmp(options.policy_file, "/etc/policy.yaml") == 0 &&
+           options.command_argv != NULL &&
+           strcmp(options.command_argv[0], "/bin/true") == 0,
+       "landlockd-run argv[0] with absolute path dispatches via basename");
+    landlockd_cli_options_release(&options);
+
+    errno = 0;
+    rc = landlockd_cli_parse(4, split_policy_dry_run_argv, &options);
+    ok(rc == 0 && options.verb == LANDLOCKD_CLI_VERB_RUN &&
+           options.dry_run == 1 && options.policy_file != NULL &&
+           strcmp(options.policy_file, "/etc/policy.yaml") == 0 &&
+           options.command_argv == NULL,
+       "landlockd-policy dry-run --policy-file parses as run with dry_run");
+    landlockd_cli_options_release(&options);
+
+    errno = 0;
+    rc = landlockd_cli_parse(4, split_policy_dry_run_name_argv, &options);
+    ok(rc == 0 && options.verb == LANDLOCKD_CLI_VERB_RUN &&
+           options.dry_run == 1 && options.policy_name != NULL &&
+           strcmp(options.policy_name, "strict") == 0 &&
+           options.command_argv == NULL,
+       "landlockd-policy dry-run --policy NAME parses as run with dry_run");
+    landlockd_cli_options_release(&options);
+
+    errno = 0;
+    rc = landlockd_cli_parse(4, plain_dry_run_argv, &options);
+    ok(rc == -1 && errno == EINVAL,
+       "landlockd dry-run without landlockd-policy basename is rejected");
     landlockd_cli_options_release(&options);
 
     done_testing();

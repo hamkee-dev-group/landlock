@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
   char err[256];
   int rc;
 
-  plan(95);
+  plan(112);
 
   if (argc < 2) {
     diag("usage: %s <policies-dir>", argv[0]);
@@ -190,13 +190,21 @@ int main(int argc, char *argv[]) {
   landlockd_policy_ir_init(&ir);
   memset(err, 0, sizeof(err));
   rc = load_capturing(broker_path, &ir, err, sizeof(err));
-  ok(rc == 0, "broker addfd policy loads successfully");
-  ok(ir.broker_addfd_count == 1 &&
+  ok(rc == 0, "broker.addfd structured policy loads successfully");
+  ok(ir.broker_addfd_count == 2 &&
          strcmp(ir.broker_addfd_rules[0].action, "open") == 0 &&
-         strcmp(ir.broker_addfd_rules[0].target, "/tmp/landlockd-addfd") == 0 &&
+         strcmp(ir.broker_addfd_rules[0].target,
+                "/tmp/landlockd-addfd-read") == 0 &&
          ir.broker_addfd_rules[0].mode != NULL &&
          strcmp(ir.broker_addfd_rules[0].mode, "read") == 0,
-     "broker.addfd populates the addfd rule list");
+     "broker.addfd[0] is action=open target=/tmp/landlockd-addfd-read mode=read");
+  ok(ir.broker_addfd_count == 2 &&
+         strcmp(ir.broker_addfd_rules[1].action, "open") == 0 &&
+         strcmp(ir.broker_addfd_rules[1].target,
+                "/tmp/landlockd-addfd-write") == 0 &&
+         ir.broker_addfd_rules[1].mode != NULL &&
+         strcmp(ir.broker_addfd_rules[1].mode, "write") == 0,
+     "broker.addfd[1] is action=open target=/tmp/landlockd-addfd-write mode=write");
   landlockd_policy_ir_reset(&ir);
   free(broker_path);
 
@@ -293,6 +301,14 @@ int main(int argc, char *argv[]) {
                 "relative runtime cwd path");
   check_invalid(dir, "broker_addfd_relative.toml", "absolute path",
                 "relative broker.addfd path");
+  check_invalid(dir, "broker_addfd_freeform.toml", "broker.addfd",
+                "free-form broker.addfd path list is rejected");
+  check_invalid(dir, "broker_addfd_missing_target.toml", "broker.addfd",
+                "broker.addfd entry with missing target is rejected");
+  check_invalid(dir, "broker_addfd_unknown_action.toml", "broker.addfd",
+                "broker.addfd entry with unknown action is rejected");
+  check_invalid(dir, "broker_addfd_unknown_mode.toml", "broker.addfd",
+                "broker.addfd entry with unknown mode is rejected");
   check_invalid(dir, "seccomp_unknown_syscall.toml", "unknown syscall",
                 "unknown seccomp syscall name");
   check_invalid(dir, "seccomp_bad_errno.toml", "out of range",

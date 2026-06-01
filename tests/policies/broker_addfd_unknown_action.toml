@@ -1,0 +1,7 @@
+version = 1
+
+[broker]
+  [[broker.addfd]]
+  action = "frobnicate"
+  target = "/tmp/landlockd-addfd"
+  mode = "read"

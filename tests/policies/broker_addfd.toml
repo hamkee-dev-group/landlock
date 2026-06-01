@@ -3,5 +3,10 @@ version = 1
 [broker]
   [[broker.addfd]]
   action = "open"
-  target = "/tmp/landlockd-addfd"
+  target = "/tmp/landlockd-addfd-read"
   mode = "read"
+
+  [[broker.addfd]]
+  action = "open"
+  target = "/tmp/landlockd-addfd-write"
+  mode = "write"

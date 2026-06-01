@@ -283,9 +283,21 @@ fn parse_addfd_list(
     let mut out = Vec::with_capacity(items.len());
     for (index, item) in items.into_iter().enumerate() {
         require_non_empty(&format!("{}[{}].action", field, index), &item.action)?;
+        if item.action != "open" {
+            return Err(format!(
+                "{}[{}].action: unknown action \"{}\"",
+                field, index, item.action
+            ));
+        }
         require_absolute(&format!("{}[{}].target", field, index), &item.target)?;
         if let Some(mode) = item.mode.as_deref() {
             require_non_empty(&format!("{}[{}].mode", field, index), mode)?;
+            if mode != "read" && mode != "write" {
+                return Err(format!(
+                    "{}[{}].mode: unknown mode \"{}\"",
+                    field, index, mode
+                ));
+            }
         }
         out.push(AddfdRuleIr {
             action: item.action,

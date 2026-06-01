@@ -392,6 +392,13 @@ static int load_broker_addfd_array(toml_array_t *addfd_arr,
              "broker.addfd[%d].action: expected a non-empty string", i);
       return -1;
     }
+    if (strcmp(action_d.u.s, "open") != 0) {
+      report(err, file_path,
+             "broker.addfd[%d].action: unknown action \"%s\"", i,
+             action_d.u.s);
+      free(action_d.u.s);
+      return -1;
+    }
 
     target_d = toml_string_in(entry, "target");
     if (!target_d.ok || target_d.u.s[0] == '\0') {
@@ -420,6 +427,15 @@ static int load_broker_addfd_array(toml_array_t *addfd_arr,
       }
       report(err, file_path,
              "broker.addfd[%d].mode: expected a non-empty string", i);
+      return -1;
+    }
+    if (mode_d.ok && strcmp(mode_d.u.s, "read") != 0 &&
+        strcmp(mode_d.u.s, "write") != 0) {
+      report(err, file_path,
+             "broker.addfd[%d].mode: unknown mode \"%s\"", i, mode_d.u.s);
+      free(action_d.u.s);
+      free(target_d.u.s);
+      free(mode_d.u.s);
       return -1;
     }
 

@@ -8,6 +8,19 @@
 #include "landlock_policy_loader.h"
 #include "tap.h"
 
+static void check_addfd_rule(const struct landlockd_policy_ir *ir, size_t index,
+                             const char *action, const char *target,
+                             const char *mode)
+{
+    ok(ir->broker_addfd_count > index &&
+           strcmp(ir->broker_addfd_rules[index].action, action) == 0 &&
+           strcmp(ir->broker_addfd_rules[index].target, target) == 0 &&
+           ir->broker_addfd_rules[index].mode != NULL &&
+           strcmp(ir->broker_addfd_rules[index].mode, mode) == 0,
+       "Rust policy helper round-trips broker.addfd[%zu] action=%s", index,
+       action);
+}
+
 static int load_capturing(const char *file_path,
                           struct landlockd_policy_ir *out,
                           char *errbuf, size_t errbufsz)
@@ -52,13 +65,21 @@ int main(int argc, char *argv[])
     }
     unsetenv("LANDLOCKD_POLICY_HELPER_BACKEND");
 
-    plan(3);
+    plan(8);
 
     landlockd_policy_ir_init(&ir);
     memset(errbuf, 0, sizeof(errbuf));
     rc = load_capturing(argv[2], &ir, errbuf, sizeof(errbuf));
-    ok(rc == 0 && ir.fs_layer_count > 0,
-       "Rust policy helper loads a valid policy through the standard helper path");
+    ok(rc == 0 && ir.broker_addfd_count == 5,
+       "Rust policy helper loads broker.addfd rules through the standard helper path");
+    check_addfd_rule(&ir, 0, "open", "/tmp/landlockd-addfd-read", "read");
+    check_addfd_rule(&ir, 1, "open_tree", "/tmp/landlockd-addfd-write",
+                     "write");
+    check_addfd_rule(&ir, 2, "scratch_open", "/tmp/landlockd-addfd-scratch",
+                     "write");
+    check_addfd_rule(&ir, 3, "fsopen", "/tmp/landlockd-addfd-fsopen", "read");
+    check_addfd_rule(&ir, 4, "fsmount", "/tmp/landlockd-addfd-fsmount",
+                     "write");
     landlockd_policy_ir_reset(&ir);
 
     landlockd_policy_ir_init(&ir);
@@ -67,7 +88,8 @@ int main(int argc, char *argv[])
     ok(rc == -1 && strstr(errbuf, argv[3]) != NULL,
        "Rust policy helper reports invalid policies through stderr");
     ok(ir.fs_layer_count == 0 && ir.fs_layers == NULL &&
-           ir.net_enabled == 0 && ir.net_rules == NULL,
+           ir.net_enabled == 0 && ir.net_rules == NULL &&
+           ir.broker_addfd_count == 0 && ir.broker_addfd_rules == NULL,
        "Rust policy helper leaves the destination IR empty on parse failure");
     landlockd_policy_ir_reset(&ir);
 

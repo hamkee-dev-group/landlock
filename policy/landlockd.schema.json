@@ -204,29 +204,18 @@
             "properties": {
               "action": {
                 "type": "string",
-                "enum": ["open"]
+                "enum": ["open", "open_tree", "scratch_open", "fsopen", "fsmount"]
               },
               "target": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "pattern": "^/"
               },
               "mode": {
-                "type": "string"
+                "type": "string",
+                "enum": ["read", "write"]
               }
-            },
-            "allOf": [
-              {
-                "if": {
-                  "properties": {"action": {"const": "open"}},
-                  "required": ["action"]
-                },
-                "then": {
-                  "properties": {
-                    "mode": {"enum": ["read", "write"]}
-                  }
-                }
-              }
-            ]
+            }
           }
         }
       }

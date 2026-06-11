@@ -71,6 +71,18 @@ static void check_invalid(const char *dir, const char *leaf,
   free(path);
 }
 
+static void check_addfd_rule(const struct landlockd_policy_ir *ir, size_t index,
+                             const char *action, const char *target,
+                             const char *mode) {
+  ok(ir->broker_addfd_count > index &&
+         strcmp(ir->broker_addfd_rules[index].action, action) == 0 &&
+         strcmp(ir->broker_addfd_rules[index].target, target) == 0 &&
+         ir->broker_addfd_rules[index].mode != NULL &&
+         strcmp(ir->broker_addfd_rules[index].mode, mode) == 0,
+     "broker.addfd[%zu] is action=%s target=%s mode=%s", index, action, target,
+     mode);
+}
+
 int main(int argc, char *argv[]) {
   struct landlockd_policy_ir ir;
   struct landlockd_policy_ir ir2;
@@ -80,7 +92,7 @@ int main(int argc, char *argv[]) {
   char err[256];
   int rc;
 
-  plan(112);
+  plan(116);
 
   if (argc < 2) {
     diag("usage: %s <policies-dir>", argv[0]);
@@ -130,8 +142,6 @@ int main(int argc, char *argv[]) {
          ir.runtime_cwd == NULL &&
          ir.seccomp_enabled == 0 && ir.seccomp_deny_count == 0,
      "valid minimal policy leaves broker exception lists empty");
-
-  
 
   landlockd_policy_ir_init(&ir2);
   rc = load_capturing(valid_path, &ir2, err, sizeof(err));
@@ -191,20 +201,13 @@ int main(int argc, char *argv[]) {
   memset(err, 0, sizeof(err));
   rc = load_capturing(broker_path, &ir, err, sizeof(err));
   ok(rc == 0, "broker.addfd structured policy loads successfully");
-  ok(ir.broker_addfd_count == 2 &&
-         strcmp(ir.broker_addfd_rules[0].action, "open") == 0 &&
-         strcmp(ir.broker_addfd_rules[0].target,
-                "/tmp/landlockd-addfd-read") == 0 &&
-         ir.broker_addfd_rules[0].mode != NULL &&
-         strcmp(ir.broker_addfd_rules[0].mode, "read") == 0,
-     "broker.addfd[0] is action=open target=/tmp/landlockd-addfd-read mode=read");
-  ok(ir.broker_addfd_count == 2 &&
-         strcmp(ir.broker_addfd_rules[1].action, "open") == 0 &&
-         strcmp(ir.broker_addfd_rules[1].target,
-                "/tmp/landlockd-addfd-write") == 0 &&
-         ir.broker_addfd_rules[1].mode != NULL &&
-         strcmp(ir.broker_addfd_rules[1].mode, "write") == 0,
-     "broker.addfd[1] is action=open target=/tmp/landlockd-addfd-write mode=write");
+  ok(ir.broker_addfd_count == 5, "broker.addfd loads five supported actions");
+  check_addfd_rule(&ir, 0, "open", "/tmp/landlockd-addfd-read", "read");
+  check_addfd_rule(&ir, 1, "open_tree", "/tmp/landlockd-addfd-write", "write");
+  check_addfd_rule(&ir, 2, "scratch_open", "/tmp/landlockd-addfd-scratch",
+                   "write");
+  check_addfd_rule(&ir, 3, "fsopen", "/tmp/landlockd-addfd-fsopen", "read");
+  check_addfd_rule(&ir, 4, "fsmount", "/tmp/landlockd-addfd-fsmount", "write");
   landlockd_policy_ir_reset(&ir);
   free(broker_path);
 

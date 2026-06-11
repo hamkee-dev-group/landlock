@@ -58,6 +58,10 @@ static const struct fs_access_name MOUNT_ATTR_NAMES[] = {
 #endif
 };
 
+static const char *const BROKER_ADDFD_ACTION_NAMES[] = {
+    "open", "open_tree", "scratch_open", "fsopen", "fsmount",
+};
+
 static void report(FILE *err, const char *file_path, const char *fmt, ...) {
   va_list ap;
   if (err == NULL) {
@@ -80,6 +84,19 @@ static int resolve_access(const struct fs_access_name *table, size_t n,
     }
   }
   return -1;
+}
+
+static int is_broker_addfd_action(const char *name) {
+  size_t i;
+
+  for (i = 0; i < sizeof(BROKER_ADDFD_ACTION_NAMES) /
+                      sizeof(BROKER_ADDFD_ACTION_NAMES[0]);
+       i++) {
+    if (strcmp(BROKER_ADDFD_ACTION_NAMES[i], name) == 0) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 static int table_has_only_keys(const toml_table_t *tab,
@@ -392,7 +409,7 @@ static int load_broker_addfd_array(toml_array_t *addfd_arr,
              "broker.addfd[%d].action: expected a non-empty string", i);
       return -1;
     }
-    if (strcmp(action_d.u.s, "open") != 0) {
+    if (!is_broker_addfd_action(action_d.u.s)) {
       report(err, file_path,
              "broker.addfd[%d].action: unknown action \"%s\"", i,
              action_d.u.s);

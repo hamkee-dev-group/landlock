@@ -7,6 +7,21 @@ version = 1
   mode = "read"
 
   [[broker.addfd]]
-  action = "open"
+  action = "open_tree"
   target = "/tmp/landlockd-addfd-write"
+  mode = "write"
+
+  [[broker.addfd]]
+  action = "scratch_open"
+  target = "/tmp/landlockd-addfd-scratch"
+  mode = "write"
+
+  [[broker.addfd]]
+  action = "fsopen"
+  target = "/tmp/landlockd-addfd-fsopen"
+  mode = "read"
+
+  [[broker.addfd]]
+  action = "fsmount"
+  target = "/tmp/landlockd-addfd-fsmount"
   mode = "write"

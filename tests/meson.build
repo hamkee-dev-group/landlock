@@ -81,6 +81,8 @@ test_cli_smoke_source = files(
 test_docs_audit_schema_source = files(
   'test_docs_audit_schema.c')
 
+python3 = find_program('python3')
+
 test_cli_exec_live_source = files(
   'test_cli_exec_live.c')
 
@@ -934,8 +936,14 @@ test_policy_loader = executable('test_policy_loader',
   link_with : liblandlock,
   dependencies : [libtap_dep, tomlc99_dep])
 
+test_policy_loader_depends = []
+if policy_loader_helper_enabled
+  test_policy_loader_depends += landlockd_policy_helper_exe
+endif
+
 test('policy_loader', test_policy_loader,
   args : [meson.current_source_dir() / 'policies'],
+  depends : test_policy_loader_depends,
   protocol : 'tap', suite : 'smoke')
 
 test_policy_loader_mode = executable('test_policy_loader_mode',
@@ -956,9 +964,14 @@ test_policy_loader_rust_helper = executable('test_policy_loader_rust_helper',
 
 test('policy_loader_rust_helper', test_policy_loader_rust_helper,
   args : [rust_policy_helper_enabled ? landlockd_policy_helper_rust_exe : 'none',
-          meson.current_source_dir() / 'policies' / 'valid_minimal.toml',
-          meson.current_source_dir() / 'policies' / 'seccomp_unknown_syscall.toml'],
+          meson.current_source_dir() / 'policies' / 'broker_addfd.toml',
+          meson.current_source_dir() / 'policies' / 'broker_addfd_unknown_action.toml'],
   protocol : 'tap', suite : 'live')
+
+test('policy_schema_broker_addfd', python3,
+  args : [meson.current_source_dir() / 'test_policy_schema_broker_addfd.py',
+          meson.project_source_root() / 'policy' / 'landlockd.schema.json'],
+  suite : 'smoke')
 
 test_cli_policy_helper_exec_failure = executable('test_cli_policy_helper_exec_failure',
   test_cli_policy_helper_exec_failure_source,

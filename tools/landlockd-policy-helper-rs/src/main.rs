@@ -30,6 +30,13 @@ const MOUNT_ATTR_RDONLY: u64 = 0x0000_0001;
 const MOUNT_ATTR_NOSUID: u64 = 0x0000_0002;
 const MOUNT_ATTR_NODEV: u64 = 0x0000_0004;
 const MOUNT_ATTR_NOEXEC: u64 = 0x0000_0008;
+const BROKER_ADDFD_ACTIONS: [&str; 5] = [
+    "open",
+    "open_tree",
+    "scratch_open",
+    "fsopen",
+    "fsmount",
+];
 
 #[derive(Default)]
 struct PolicyIr {
@@ -283,7 +290,7 @@ fn parse_addfd_list(
     let mut out = Vec::with_capacity(items.len());
     for (index, item) in items.into_iter().enumerate() {
         require_non_empty(&format!("{}[{}].action", field, index), &item.action)?;
-        if item.action != "open" {
+        if !BROKER_ADDFD_ACTIONS.contains(&item.action.as_str()) {
             return Err(format!(
                 "{}[{}].action: unknown action \"{}\"",
                 field, index, item.action

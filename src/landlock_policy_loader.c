@@ -14,7 +14,15 @@
 #include <unistd.h>
 
 #define LANDLOCKD_POLICY_WIRE_MAGIC 0x4c504c44u
-#define LANDLOCKD_POLICY_WIRE_VERSION 15u
+/*
+ * Wire format version. Bumped for the broker.addfd rules serialized into the
+ * IR: a broker_addfd_count u32 in the header (adjacent to
+ * broker_mount_object_count) plus one per-rule record of length-prefixed
+ * action + target (+ optional mode) strings. Versions 13-15 predate the
+ * reader's closed-set action validation, so they are rejected outright rather
+ * than silently misinterpreted.
+ */
+#define LANDLOCKD_POLICY_WIRE_VERSION 16u
 
 #ifdef LANDLOCKD_POLICY_LOADER_USE_HELPER
 static int helper_path_exists(const char *path) {
@@ -460,6 +468,24 @@ static int read_u64_buf(const unsigned char *buf, size_t len, size_t *off,
   return 0;
 }
 
+/* Closed set of broker.addfd actions; must stay in lockstep with
+   BROKER_ADDFD_ACTION_NAMES in the in-process loader. The wire reader rejects
+   any action outside this set so a corrupt or forged blob cannot smuggle an
+   unknown broker.addfd action past the loader's own validation. */
+static int wire_broker_addfd_action_is_known(const char *action) {
+  static const char *const names[] = {
+      "open", "open_tree", "scratch_open", "fsopen", "fsmount",
+  };
+  size_t i;
+
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    if (strcmp(names[i], action) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static int load_ir_from_wire(const unsigned char *buf, size_t len,
                              struct landlockd_policy_ir *out_ir) {
   uint32_t magic;
@@ -829,6 +855,11 @@ fail_mount_object:
     memcpy(action, buf + off, path_len);
     action[path_len] = '\0';
     off += path_len;
+    if (!wire_broker_addfd_action_is_known(action)) {
+      free(action);
+      errno = EINVAL;
+      return -1;
+    }
 
     if (read_u32_buf(buf, len, &off, &path_len) < 0 || off + path_len > len) {
       free(action);

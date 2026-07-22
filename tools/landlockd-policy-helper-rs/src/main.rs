@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::process;
 
 const LANDLOCKD_POLICY_WIRE_MAGIC: u32 = 0x4c50_4c44;
-const LANDLOCKD_POLICY_WIRE_VERSION: u32 = 15;
+const LANDLOCKD_POLICY_WIRE_VERSION: u32 = 16;
 const DEFAULT_SECCOMP_ERRNO: u16 = 1;
 
 const ACCESS_EXECUTE: u64 = 1u64 << 0;

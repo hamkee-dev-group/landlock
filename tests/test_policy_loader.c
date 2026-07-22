@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
   char err[256];
   int rc;
 
-  plan(116);
+  plan(117);
 
   if (argc < 2) {
     diag("usage: %s <policies-dir>", argv[0]);
@@ -208,6 +208,26 @@ int main(int argc, char *argv[]) {
                    "write");
   check_addfd_rule(&ir, 3, "fsopen", "/tmp/landlockd-addfd-fsopen", "read");
   check_addfd_rule(&ir, 4, "fsmount", "/tmp/landlockd-addfd-fsmount", "write");
+  {
+    struct landlockd_policy_ir ir_ip;
+    int rc_ip;
+    int match;
+    size_t k;
+
+    landlockd_policy_ir_init(&ir_ip);
+    rc_ip = landlockd_policy_load_file_in_process(broker_path, &ir_ip, NULL);
+    match = rc_ip == 0 && ir_ip.broker_addfd_count == ir.broker_addfd_count;
+    for (k = 0; match && k < ir.broker_addfd_count; k++) {
+      match = strcmp(ir_ip.broker_addfd_rules[k].action,
+                     ir.broker_addfd_rules[k].action) == 0 &&
+              strcmp(ir_ip.broker_addfd_rules[k].target,
+                     ir.broker_addfd_rules[k].target) == 0;
+    }
+    ok(match,
+       "broker.addfd wire path yields the same (action,target) pairs as the "
+       "in-process path");
+    landlockd_policy_ir_reset(&ir_ip);
+  }
   landlockd_policy_ir_reset(&ir);
   free(broker_path);
 

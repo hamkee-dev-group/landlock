@@ -86,8 +86,16 @@ int main(int argc, char *argv[])
 {
     char tempdir[] = "/tmp/landlockd-ir-deterministic-XXXXXX";
     char policy_path[256];
+    char addfd_policy_path[256];
     char *dry_run_argv[] = {"landlockd", "run", "--policy-file", policy_path,
                             "--dry-run", "--", "/bin/true", NULL};
+    char *addfd_dry_run_argv[] = {"landlockd",       "run", "--policy-file",
+                                  addfd_policy_path, "--dry-run", "--",
+                                  "/bin/true",       NULL};
+    char stdout_c[4096];
+    char stdout_d[4096];
+    int status_c;
+    int status_d;
     char *argv_a[] = {"landlockd", "--ro", "/a", "--ro", "/b", "--", "/bin/echo",
                       "hi", NULL};
     char *argv_b[] = {"landlockd", "--ro", "/a", "--ro", "/b", "--", "/bin/echo",
@@ -110,7 +118,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    plan(13);
+    plan(16);
 
     errno = 0;
     rc_a = landlockd_cli_parse(8, argv_a, &first);
@@ -189,6 +197,36 @@ int main(int argc, char *argv[])
     ok(strncmp(stdout_a, "landlockd dry-run v1\n",
                strlen("landlockd dry-run v1\n")) == 0,
        "real dry-run output begins with the stable header");
+
+    if (snprintf(addfd_policy_path, sizeof(addfd_policy_path),
+                 "%s/addfd.toml", tempdir) >= (int)sizeof(addfd_policy_path) ||
+        write_text_file(addfd_policy_path,
+                        "version = 1\n\n"
+                        "[[fs_layer]]\n"
+                        "handled_access_fs = [\"read_file\"]\n\n"
+                        "  [[fs_layer.rule]]\n"
+                        "  path = \"/etc\"\n"
+                        "  allowed_access = [\"read_file\"]\n\n"
+                        "[broker]\n"
+                        "allow_read = [\"/etc/resolv.conf\"]\n\n"
+                        "  [[broker.addfd]]\n"
+                        "  action = \"open\"\n"
+                        "  target = \"/etc/resolv.conf\"\n"
+                        "  mode = \"read\"\n") < 0) {
+        diag("addfd fixture setup failed: %s", strerror(errno));
+        return 1;
+    }
+
+    ok(run_landlockd_capture_stdout(argv[1], addfd_dry_run_argv, &status_c,
+                                    stdout_c, sizeof(stdout_c)) == 0 &&
+           run_landlockd_capture_stdout(argv[1], addfd_dry_run_argv, &status_d,
+                                        stdout_d, sizeof(stdout_d)) == 0,
+       "broker.addfd dry-run output can be captured twice from the real binary");
+    ok(WIFEXITED(status_c) && WEXITSTATUS(status_c) == 0 &&
+           WIFEXITED(status_d) && WEXITSTATUS(status_d) == 0,
+       "real dry-run exits 0 twice for a broker.addfd policy file");
+    ok(strcmp(stdout_c, stdout_d) == 0,
+       "broker.addfd wire serialization is byte-for-byte reproducible");
 
     done_testing();
 }

@@ -861,7 +861,7 @@ test('landlock_policy', test_landlock_policy, protocol : 'tap', suite : 'smoke')
 
 test_policy_ir = executable('test_policy_ir',
   test_policy_ir_source,
-  include_directories : inc,
+  include_directories : [inc, src_inc],
   link_with : liblandlock,
   dependencies : libtap_dep)
 

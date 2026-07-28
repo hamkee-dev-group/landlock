@@ -1,5 +1,8 @@
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 
+#include "landlock_policy_ir.h"
 #include "landlockd/policy_ir.h"
 #include "tap.h"
 
@@ -43,7 +46,7 @@ int main(void) {
   const struct landlockd_ir_layer *one_layer_array[1];
   struct landlockd_ir_policy tmp_policy;
 
-  plan(14);
+  plan(18);
 
   errno = 0;
   ok(landlockd_ir_policy_validate(&policy) == 0 && errno == 0,
@@ -160,6 +163,53 @@ int main(void) {
     errno = 0;
     ok(landlockd_ir_policy_validate(&tmp_policy) == 0 && errno == 0,
        "preserves declared order across multiple layers of the same kind");
+  }
+
+  {
+    static const char *const addfd_actions[] = {
+        "open", "open_tree", "scratch_open", "fsopen", "fsmount"};
+    struct landlockd_policy_ir addfd_ir;
+    struct landlockd_policy_ir addfd_copy;
+    size_t k;
+    int all_added = 1;
+    int pairs_ok;
+
+    landlockd_policy_ir_init(&addfd_ir);
+    for (k = 0; k < sizeof(addfd_actions) / sizeof(addfd_actions[0]); k++) {
+      char target[32];
+      snprintf(target, sizeof(target), "/fd/%zu", k);
+      if (landlockd_policy_ir_add_broker_addfd_rule(&addfd_ir, addfd_actions[k],
+                                                    target, NULL) != 0) {
+        all_added = 0;
+      }
+    }
+    ok(all_added && addfd_ir.broker_addfd_count == 5,
+       "stores a broker.addfd rule for each addfd action");
+
+    errno = 0;
+    ok(landlockd_policy_ir_add_broker_addfd_rule(&addfd_ir, "", "/fd/x",
+                                                 NULL) == -1 &&
+           errno == EINVAL,
+       "rejects a broker.addfd rule with an empty action");
+
+    landlockd_policy_ir_init(&addfd_copy);
+    pairs_ok = landlockd_policy_ir_copy(&addfd_ir, &addfd_copy) == 0 &&
+               addfd_copy.broker_addfd_count == addfd_ir.broker_addfd_count;
+    for (k = 0; k < addfd_ir.broker_addfd_count && pairs_ok; k++) {
+      if (strcmp(addfd_copy.broker_addfd_rules[k].action,
+                 addfd_ir.broker_addfd_rules[k].action) != 0 ||
+          strcmp(addfd_copy.broker_addfd_rules[k].target,
+                 addfd_ir.broker_addfd_rules[k].target) != 0) {
+        pairs_ok = 0;
+      }
+    }
+    ok(pairs_ok,
+       "copy reproduces the broker.addfd count and every (action, target) pair");
+
+    landlockd_policy_ir_reset(&addfd_ir);
+    ok(addfd_ir.broker_addfd_count == 0 && addfd_ir.broker_addfd_rules == NULL,
+       "reset zeros the broker.addfd count and frees its rules");
+    landlockd_policy_ir_reset(&addfd_copy);
   }
 
   done_testing();

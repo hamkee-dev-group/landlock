@@ -1,5 +1,5 @@
-#ifndef LANDLOCKD_POLICY_IR_H
-#define LANDLOCKD_POLICY_IR_H
+#ifndef LANDLOCK_POLICY_IR_H
+#define LANDLOCK_POLICY_IR_H
 
 #include <stddef.h>
 #include <stdint.h>
